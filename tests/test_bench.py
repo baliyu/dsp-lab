@@ -176,3 +176,34 @@ def test_a_wrong_filter_makes_the_benchmark_fail(tmp_path, pattern, replacement)
     r = run(exe)
     assert r.returncode != 0
     assert bench.check(r.stdout)[0]
+
+
+# ---- capture gaps: lines cut short or glued together ----------------------------------------------------------------------------------------
+
+def test_a_glued_line_is_ignored_and_reported_not_turned_into_a_fake_setting(good_log):
+    glued = "ENV optimisationENV zephyr 4.4.2\n" + good_log                  # the end of one line glued to the start of the next, as in the first Nano capture
+    runs, env, ignored = bench.parse_log(glued)
+    assert "optimisationENV" not in env and ignored >= 1
+    problems, rep = bench.check(glued)
+    assert problems == [] and any("ignored" in r for r in rep)
+
+
+def test_a_log_that_starts_mid_line_and_ends_on_a_summary_checks_only_the_complete_runs(good_log):
+    cut = good_log.splitlines()
+    partial = ["  speed (-O1, -O2 or -O3; read the exact flag from the build)", cut[3], cut[4][:60] + cut[0]] + cut      # a partial run, a cut line, then the real log
+    problems, rep = bench.check("\n".join(partial) + "\n")
+    assert problems == [] and "1 complete run(s)" in rep[0]
+
+
+def test_two_lines_glued_inside_a_complete_run_make_the_check_fail(good_log):
+    lines = good_log.splitlines()
+    i = next(k for k, l in enumerate(lines) if l.startswith("RESULT fir31_lp1000 sine_500"))
+    lines[i - 1] = lines[i - 1] + lines[i]                                      # one RESULT line swallowed by its neighbour
+    del lines[i]
+    problems, _ = bench.check("\n".join(lines) + "\n")
+    assert any("missing" in p for p in problems)
+
+
+def test_a_missing_log_file_gives_a_plain_message_and_exit_code_2(capsys, tmp_path):
+    assert bench.main(["bench", "check", str(tmp_path / "nope.log")]) == 2
+    assert "cannot read the log file" in capsys.readouterr().out

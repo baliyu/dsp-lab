@@ -8,16 +8,16 @@ Built with AI assistance (Claude). I chose the project and its checks and ran ev
 ## Status, stated plainly
 
 - **Stage 1 of 5 is done:** the library and its tests on the PC.
-- **Stage 2 harness is built but has not run on a board.** It is tested on the PC and, in my sandbox, in an emulated Cortex-M4. **No cycle counts yet.** See [docs/BENCH.md](docs/BENCH.md).
+- **Stage 2 is done:** on an Arduino Nano 33 BLE (Cortex-M4F, 64 MHz) the output was bit-identical to the PC model for every test block in 3 complete runs. Measured with the DWT cycle counter, best case (interrupts masked, data in RAM): **132 cycles per sample** for the 2-section biquad cascade and **373** for the 31-tap FIR. One board, one compiler setting; the capture has small gaps. See [docs/BENCH.md](docs/BENCH.md) for the method, the log and the limits.
 - A biquad cascade (IIR) and a FIR filter, 16-bit samples, 64-bit accumulators, rounding to nearest, saturation.
-- 93 tests (75 for the filters, 18 for the benchmark harness). The C code, built into a library and called from Python, must equal an integer model **bit for bit** on every test signal; and the model must stay within a stated error of the ideal floating-point (SciPy) filter.
+- 97 tests (75 for the filters, 22 for the benchmark harness and its log checker). The C code, built into a library and called from Python, must equal an integer model **bit for bit** on every test signal; and the model must stay within a stated error of the ideal floating-point (SciPy) filter.
 - The tests were checked by breaking the code on purpose: 25 deliberate bugs, each caught. One check found a real hole in my tests (the FIR's start-up clearing was never exercised because my test helper pre-zeroed the memory); it is fixed.
 - Findings so far (see [docs/DESIGN.md](docs/DESIGN.md)): SciPy's default section gains do not fit 16-bit coefficients and must be shared between sections; the 50 Hz DC blocker loses up to 361 LSB to coefficient quantisation, while the 1000 Hz low-pass stays within 4.2 LSB; a 1 LSB limit cycle remains after an impulse.
 
 ## Plan
 
 1. Library, integer model, tests (done).
-2. Cycle-count harness and the M4F (Arduino Nano 33 BLE): cycles per sample, output identical to the PC (harness built; board run pending).
+2. Cycle-count harness and the M4F (Arduino Nano 33 BLE): cycles per sample, output identical to the PC (done).
 3. The same on the Cortex-M0+ (Adafruit Feather M0), where the 64-bit accumulator will be slow.
 4. An optimisation with measured before-and-after numbers (32-bit accumulation, gain scaling by signal level, CMSIS-DSP for comparison).
 5. A results table and a README with the limits.

@@ -1,7 +1,7 @@
 # Stage 2: the benchmark on the Arduino Nano 33 BLE (Cortex-M4F)
 
-Built with AI assistance (Claude). **Status: the harness is built and tested on the PC and in an emulator. It has not run on the board yet, so this
-repository has no cycle counts yet.** This page will get the measured numbers only after a real run, with the log committed under `bench/logs/`.
+Built with AI assistance (Claude). **Status: the harness has run on one Nano 33 BLE.** The output was bit-identical to the model in every complete run, and the
+first cycle counts are below. The log of that run is committed as `bench/logs/nano_run1.log`.
 
 ## What it does
 
@@ -40,8 +40,25 @@ PowerShell, with the Nano in bootloader mode (double-tap RESET until the orange 
 & $B --port=COM7 -U -i -e -w -v 'C:\zephyr_flash\dsp_bench.bin' -R
 ```
 
-Then open the board's new serial port in PuTTY with session logging on (all session output) to `C:\dsp-lab\bench\logs\nano_run1.log`. The program waits until
-a terminal opens the port, then prints one run about every 10 seconds. Back in WSL:
+The running app has its own serial port, usually a different COM number from the bootloader's (find it with
+`Get-CimInstance Win32_SerialPort | Select-Object DeviceID, Description`). The program waits until a terminal opens the port, then prints one run about every 10 seconds.
+Close any terminal program, then capture 35 seconds to a file with PowerShell (here the port is COM14):
+
+```
+$p = New-Object System.IO.Ports.SerialPort COM14,115200
+$p.DtrEnable = $true
+$p.Open()
+$sb = New-Object System.Text.StringBuilder
+$end = (Get-Date).AddSeconds(35)
+while ((Get-Date) -lt $end) {
+  if ($p.BytesToRead -gt 0) { [void]$sb.Append($p.ReadExisting()) } else { Start-Sleep -Milliseconds 100 }
+}
+$p.Close()
+[IO.File]::WriteAllText('C:\dsp-lab\bench\logs\nano_run1.log', $sb.ToString())
+```
+
+The capture can start in the middle of a run (the board prints whether or not a terminal is open), so the file may begin with a partial run; the checker uses only complete runs
+and reports how many lines it ignored. Back in WSL:
 
 ```
 PYTHONPATH=python python -m dsp_lab.bench check bench/logs/nano_run1.log
@@ -59,6 +76,29 @@ The check prints the cycles per sample and ends with PASS only if every checksum
 - The input block, output block, coefficients and filter state are in RAM during timing. The code runs from flash behind the nRF52840 instruction cache.
 - The log records the compiler version and Zephyr version. The build uses `CONFIG_SPEED_OPTIMIZATIONS=y` (`-O2`, `-mcpu=cortex-m4 -mthumb`).
 
+## First result (one board, one run of the program, 31 October 2026)
+
+Log: `bench/logs/nano_run1.log` (3 complete runs). Checked with `python -m dsp_lab.bench check`: **every one of the 66 output blocks (3 runs x 22) has the model's CRC-32**, and the
+minimum cycle count of every block is identical from the first complete run to the last.
+
+| Filter | Cycles per sample (minimum of 3 repeats) | Spread over the 11 test vectors |
+|---|---|---|
+| Biquad cascade, 2 sections | **132.06** | 132.06 on ten vectors; 132.90 on `square_fullscale` |
+| FIR, 31 taps | **373.10** | 373.10 on ten vectors; 373.35 on `square_fullscale` |
+
+- The maximum over the 3 repeats is within 0.02 cycles per sample of the minimum, so the cache and flash did not make the repeats differ visibly in this run.
+- Why `square_fullscale` costs a little more is not investigated (saturation is the obvious suspect, not tested).
+- Derived, not measured separately: at the measured CPU clock (about 63.98 MHz) that is about 2.06 us per sample for the biquad cascade and 5.83 us for the FIR, which is about
+  1.7% and 4.7% of the 125 us between samples at 8 kHz, for the filter code alone. The FIR costs 2.8 times as much as the 2-section cascade here.
+- Counter overhead: 18 cycles per block, so it does not matter at 2000 samples. The CPU clock measured against the RTC was 63.98 MHz (resolution about 0.03%).
+- Build: Zephyr 4.4.2, GCC 14.3.0 from Zephyr SDK 1.0.1, `CONFIG_SPEED_OPTIMIZATIONS=y`. Zephyr compiles that with `-O2`; I confirmed the `-O2` flag in my own sandbox build of the
+  same Zephyr version, not by reading the compile command of this build.
+- **The capture has gaps.** The file starts in the middle of a run (line 1 is the tail of a line), and the first two runs in it are cut short: line 10 ends mid-line, and in
+  line 15 the end of one line is glued to the start of the next run. Those three lines are the only damaged ones, and all lie before the first complete run; the last three runs are
+  whole and end exactly at the end of the file. Whether the bytes were lost by the board's USB output or by my PowerShell capture is **not established**. A damaged line inside a
+  complete run would make the check fail (a test covers it), and none did.
+- Not shown by this run: other boards, other compiler flags, a different `reps` value, interrupts running, inputs read from flash instead of RAM, or any comparison with another implementation.
+
 ## What the measurement does not cover
 
 - **Interrupts:** masked on purpose, so their cost is excluded. In a real system they would add to the time a block takes.
@@ -70,7 +110,7 @@ The check prints the cycles per sample and ends with PASS only if every checksum
 
 ## What was checked before any board run
 
-- 93 tests pass on the PC (75 from stage 1, 18 new). The benchmark core is built on the PC with strict warnings and its checksums equal the model's, a third CRC implementation
+- 97 tests pass on the PC (75 from stage 1, 22 for the benchmark and its checker). The benchmark core is built on the PC with strict warnings and its checksums equal the model's, a third CRC implementation
   (bit by bit, in C) agreeing with Python's zlib. A fake counter that starts near the 32-bit wrap checks that exactly two counter reads surround each block, interrupts are masked and
   unmasked in pairs, and the wrap is handled.
 - The checker is tested against logs with a wrong checksum, a device that reports failure, a stale header, missing or duplicated lines, wrong totals, wrong configuration, and
@@ -85,4 +125,5 @@ The check prints the cycles per sample and ends with PASS only if every checksum
 
 ## Not yet verified
 
-The DWT code and the USB console are the parts only the board can test. A first run on the board may find bugs the tests missed, as earlier projects did.
+- One run on one board. The DWT counter and the USB console worked in that run; the cause of the capture gaps above is open.
+- Nothing has run on the Cortex-M0+ yet (stage 3), and no optimisation has been measured (stage 4).

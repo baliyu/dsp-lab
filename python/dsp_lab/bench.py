@@ -86,6 +86,7 @@ BANNER = re.compile(r"^BENCH 1 n=(\d+) vectors=(\d+) sections=(\d+) taps=(\d+) r
 SUMMARY = re.compile(r"^SUMMARY runs=(\d+) failed=(\d+)\s*$")
 OVERHEAD = re.compile(r"^OVERHEAD cyc_min=(\d+)\s*$")
 ENV = re.compile(r"^ENV (\S+) (.*?)\s*$")
+MARKER = re.compile(r".(ENV |RESULT |BENCH |SUMMARY |OVERHEAD )")      # a second log keyword inside a line: two lines were glued together or one was cut short
 
 
 class Run:
@@ -97,14 +98,18 @@ class Run:
 
 
 def parse_log(text: str):
-    """Returns (runs, env, ignored_lines). A run starts at a BENCH line; only runs that reach their SUMMARY line are complete."""
+    """Returns (runs, env, ignored_lines). A run starts at a BENCH line; only runs that reach their SUMMARY line are complete.
+    A line with a second keyword in the middle (a capture gap: the end of one line glued to the start of the next) is never parsed; it is counted in
+    ignored_lines, as is every other line that is not understood."""
     runs: list[Run] = []
     env: dict[str, str] = {}
     cur = None
     ignored = 0
     for raw in text.splitlines():
         line = raw.strip("\r\n ")
-        if m := BANNER.match(line):
+        if MARKER.search(line):
+            ignored += 1
+        elif m := BANNER.match(line):
             cur = Run(tuple(int(g) for g in m.groups()))
             runs.append(cur)
         elif m := ENV.match(line):
@@ -128,7 +133,7 @@ def check(text: str):
     exp = expected()
     names = list(vectors.make_vectors(FS, N))
     want = {(f, v) for f in FILTERS for v in names}
-    runs, env, _ = parse_log(text)
+    runs, env, ignored = parse_log(text)
     problems: list[str] = []
     complete = [r for r in runs if r.summary is not None]
     if not complete:
@@ -159,6 +164,9 @@ def check(text: str):
     rep = []
     last = complete[-1]
     rep.append(f"{len(complete)} complete run(s) in the log; checksums {'ALL MATCH the model' if not problems else 'DO NOT ALL MATCH'}.")
+    if len(runs) > len(complete) or ignored:
+        rep.append(f"  note: {len(runs)} run(s) started, {len(complete)} complete; {ignored} line(s) were partial, glued or not understood and were ignored"
+                   " (the capture has gaps; only complete runs are checked).")
     for k in sorted(env):
         rep.append(f"  env {k}: {env[k]}")
     if last.overhead is not None:
@@ -182,7 +190,12 @@ def main(argv: list[str]) -> int:
         print(f"wrote {argv[2]}")
         return 0
     if len(argv) == 3 and argv[1] == "check":
-        problems, rep = check(Path(argv[2]).read_text(errors="replace"))
+        try:
+            text = Path(argv[2]).read_text(errors="replace")
+        except OSError as e:
+            print(f"cannot read the log file: {e.strerror}: {argv[2]}")
+            return 2
+        problems, rep = check(text)
         print("\n".join(rep))
         if problems:
             print("\nPROBLEMS:")

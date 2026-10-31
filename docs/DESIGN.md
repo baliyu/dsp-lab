@@ -38,7 +38,7 @@ recursive fixed-point filters). Silence in gives silence out. A test pins this a
 
 ## Limits
 
-- Nothing here has run on a microcontroller yet. The 64-bit accumulator is simple and safe; on a Cortex-M0+ (no 64-bit multiply) it will be slow, and how slow is not yet measured.
+- The code has run on one Cortex-M4F (Arduino Nano 33 BLE) with cycle counts in [BENCH.md](BENCH.md). It has not run on a Cortex-M0+ yet; there the 64-bit accumulator is simple and safe but (no 64-bit multiply) will be slow, and how slow is not yet measured.
 - The error figures come from these test vectors, not from a proof; the bounds are not worst-case guarantees for every possible input.
 - One filter type per kind has been tested. No FFT, no resampling yet.
 - Python 3.12 and 3.13 are tested in CI; the C code is built with `-Wall -Wextra -Werror -Wconversion`.
