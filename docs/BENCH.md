@@ -1,7 +1,7 @@
 # Stage 2: the benchmark on the Arduino Nano 33 BLE (Cortex-M4F)
 
-Built with AI assistance (Claude). **Status: the harness has run on one Nano 33 BLE (stage 2) and one Feather M0 (stage 3).** The output was bit-identical to the model in every complete
-run on both, and the first cycle counts are below. The logs are committed as `bench/logs/nano_run1.log` and `bench/logs/feather_run1.log`.
+Built with AI assistance (Claude). **Status: the harness has run on one Nano 33 BLE (stage 2) and one Feather M0 (stages 3 and 4).** The output was bit-identical to the model in every complete
+run on both, and the first cycle counts are below. The logs are committed as `bench/logs/nano_run1.log`, `bench/logs/feather_run1.log` and `bench/logs/feather_run2.log`.
 
 ## What it does
 
@@ -177,7 +177,7 @@ To run it: install the "Adafruit SAMD Boards" package in the Arduino IDE; open `
 (this overwrites whatever sketch is on the board). Close the Serial Monitor, then capture 35 seconds with the PowerShell block above, using the board's COM port and the file name
 `bench/logs/feather_run1.log`, and check it with `python -m dsp_lab.bench check`.
 
-## Stage 4: variants (32-bit accumulator, optimisation level): harness built, **not yet run on a board**
+## Stage 4: variants (32-bit accumulator, optimisation level)
 
 The benchmark now times a list of *variants* (`bench/core/bench_variants.h`) of both filters, and the log names each case `<filter>:<variant>` (for example `fir31_lp1000:acc32`). The log banner is
 `BENCH 2 ... variants=N`; the older version-1 logs (`nano_run1.log`, `feather_run1.log`) are still read and still pass, and a test requires that.
@@ -193,6 +193,33 @@ The pass condition is unchanged: **every variant must give the model's checksum 
 
 The `-O2` variants are built with a pragma inside a program compiled at `-Os`; this is not the same as building the whole program at `-O2` (other compiler settings stay at `-Os`), and the GCC manual
 advises against the pragma for production code. It is used here because it lets one upload time both levels. The first thing to confirm in a result is therefore how the `_O2` variants compare with the Nano's real `-O2` build.
+
+### First result (Feather M0, one run of the sketch, 31 October 2026)
+
+Log: `bench/logs/feather_run2.log`: 4 complete runs, 352 output blocks (8 cases x 11 vectors x 4 runs), **every one with the model's CRC-32, including every 32-bit block**. The fifth run in the
+file is cut off by the end of the 120-second capture; no lines are damaged. The minimum cycle count of every block is identical from the first complete run to the last.
+
+Cycles per sample (minimum of 3 repeats; mean of the 11 vectors, and the lowest to highest vector); the ratio is to `acc64` in the same run:
+
+| Case | `acc64` | `acc32` | `acc64_O2` | `acc32_O2` |
+|---|---|---|---|---|
+| Biquad cascade, 2 sections | 1018.4 (1012.1 to 1022.6) | **244.0** (243.7 to 244.1), 4.17x | 1007.0 (999.1 to 1011.6), 1.01x | 247.3 (247.1 to 249.2), 4.12x |
+| FIR, 31 taps | 3453.5 (3440.1 to 3463.4) | 1087.0 (1086.5 to 1087.1), 3.18x | 2857.6 (2844.4 to 2866.4), 1.21x | **563.2** (563.2 to 563.2), 6.13x |
+
+- **The 32-bit accumulator cuts the cycles by about 4.2 times (biquad) and 3.2 times (FIR) at the build's `-Os`, with identical output**, for coefficients that pass the check in [DESIGN.md](DESIGN.md).
+  That guarantee comes from the check, not from this run. It is smaller than I had guessed before measuring.
+- Derived, at 48 MHz and for the filter code alone: the biquad cascade goes from 21.2 us per sample (17% of the 125 us between samples at 8 kHz) to 5.1 us (4.1%); the FIR from 72.0 us (58%) to 11.7 us (9.4%) with
+  `acc32_O2`.
+- **Against the Nano** (its stage 2 `-O2` build of the 64-bit code, 132.1 and 373.1 cycles): the Feather needed 7.7 and 9.3 times the cycles with `acc64`, and 1.85 and 1.5 times with the best 32-bit variant. Not like-for-like: the Nano has
+  not been run with the 32-bit variant, and the builds differ in compiler (GCC 9.2.1 here, 14.3.0 there) and in how `-O2` is applied.
+- **The `_O2` pragma:** it changes nothing for the biquad (1.01x) but speeds the 64-bit FIR by 1.2 times and the 32-bit FIR by 1.9 times (1087 to 563). The 32-bit FIR costs about 35 cycles per tap at `-Os` and 18 at `-O2`. I have not looked at
+  why. Whether a real whole-program `-O2` build would give the same is not tested.
+- The 32-bit biquad still costs about 122 cycles per section. I have not looked at the instructions or at flash wait states, so I cannot say what the remaining cost is.
+- Spread over the vectors: about 1% for the 64-bit biquad and 0.7% for the 64-bit FIR; the 32-bit FIR variants are flat to 0.05% (`acc32_O2` is exactly constant). That fits the earlier guess that the library multiply's time depends on the data,
+  but does not prove it.
+- **Do not read differences of 1 to 2% as real.** The same source at the same flags (`acc64` at `-Os`) measured 1.9% lower for the biquad (1038.4 to 1018.4) and 0.9% lower for the FIR (3485.1 to 3453.5) than in stage 3, because it is a different
+  program (different code layout). Compare variants inside one run.
+- Timer: 48,001,269 counts per second against `micros()` (same caveat as stage 3); overhead 49 cycles per block. Interrupts masked, data in RAM, as before.
 
 What was checked before any board run (sandbox and CI; no board):
 
