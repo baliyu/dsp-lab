@@ -1,0 +1,104 @@
+ speed (-O1, -O2 or -O3; read the exact flag from the build)
+OVERHEAD cyc_min=18
+RESULT biquad2_lp1000 impulse n=2000 crc=e47e9d9b expect=e47e9d9b ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 step n=2000 crc=49049514 expect=49049514 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_100 n=2000 crc=57abedc9 expect=57abedc9 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_500 n=2000 crc=b74fc172 expect=b74fc172 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_1000 n=2000 crc=edcd3a96 expect=edcd3a96 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_2000 n=2000 crc=26a4cac9 expect=26a4cac9 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_3500 n=2000 crc=931b1ebe expect=931b1ebe ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 chirp n=2000 crc=8f551f7e expect=8f551f7e ok=1 cyc_min=264117 cyc_max=26ENV zephyr 4.4.2
+ENV board arduino_nano_33_ble (nRF52840, Cortex-M4F)
+ENV cpu_hz_measured 63983420
+BENCH 1 n=2000 vectors=11 sections=2 taps=31 reps=3
+ENV compiler 14.3.0
+ENV optimisationENV zephyr 4.4.2
+ENV board arduino_nano_33_ble (nRF52840, Cortex-M4F)
+ENV cpu_hz_measured 63983220
+BENCH 1 n=2000 vectors=11 sections=2 taps=31 reps=3
+ENV compiler 14.3.0
+ENV optimisation speed (-O1, -O2 or -O3; read the exact flag from the build)
+OVERHEAD cyc_min=18
+RESULT biquad2_lp1000 impulse n=2000 crc=e47e9d9b expect=e47e9d9b ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 step n=2000 crc=49049514 expect=49049514 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_100 n=2000 crc=57abedc9 expect=57abedc9 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_500 n=2000 crc=b74fc172 expect=b74fc172 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_1000 n=2000 crc=edcd3a96 expect=edcd3a96 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_2000 n=2000 crc=26a4cac9 expect=26a4cac9 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_3500 n=2000 crc=931b1ebe expect=931b1ebe ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 chirp n=2000 crc=8f551f7e expect=8f551f7e ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 noise n=2000 crc=f6873b57 expect=f6873b57 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 square_fullscale n=2000 crc=03f120db expect=03f120db ok=1 cyc_min=265798 cyc_max=265805
+RESULT biquad2_lp1000 silence n=2000 crc=3a8b93be expect=3a8b93be ok=1 cyc_min=264117 cyc_max=264124
+RESULT fir31_lp1000 impulse n=2000 crc=a18162ae expect=a18162ae ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 step n=2000 crc=c5aaa2d9 expect=c5aaa2d9 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_100 n=2000 crc=4b293b4a expect=4b293b4a ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_500 n=2000 crc=f911b31d expect=f911b31d ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_1000 n=2000 crc=e5dd82ed expect=e5dd82ed ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_2000 n=2000 crc=c08dc537 expect=c08dc537 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_3500 n=2000 crc=11f6145d expect=11f6145d ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 chirp n=2000 crc=274a48b0 expect=274a48b0 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 noise n=2000 crc=336c66d1 expect=336c66d1 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 square_fullscale n=2000 crc=3e10108b expect=3e10108b ok=1 cyc_min=746695 cyc_max=746717
+RESULT fir31_lp1000 silence n=2000 crc=3a8b93be expect=3a8b93be ok=1 cyc_min=746208 cyc_max=746230
+SUMMARY runs=22 failed=0
+ENV zephyr 4.4.2
+ENV board arduino_nano_33_ble (nRF52840, Cortex-M4F)
+ENV cpu_hz_measured 63983661
+BENCH 1 n=2000 vectors=11 sections=2 taps=31 reps=3
+ENV compiler 14.3.0
+ENV optimisation speed (-O1, -O2 or -O3; read the exact flag from the build)
+OVERHEAD cyc_min=18
+RESULT biquad2_lp1000 impulse n=2000 crc=e47e9d9b expect=e47e9d9b ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 step n=2000 crc=49049514 expect=49049514 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_100 n=2000 crc=57abedc9 expect=57abedc9 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_500 n=2000 crc=b74fc172 expect=b74fc172 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_1000 n=2000 crc=edcd3a96 expect=edcd3a96 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_2000 n=2000 crc=26a4cac9 expect=26a4cac9 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_3500 n=2000 crc=931b1ebe expect=931b1ebe ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 chirp n=2000 crc=8f551f7e expect=8f551f7e ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 noise n=2000 crc=f6873b57 expect=f6873b57 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 square_fullscale n=2000 crc=03f120db expect=03f120db ok=1 cyc_min=265798 cyc_max=265805
+RESULT biquad2_lp1000 silence n=2000 crc=3a8b93be expect=3a8b93be ok=1 cyc_min=264117 cyc_max=264124
+RESULT fir31_lp1000 impulse n=2000 crc=a18162ae expect=a18162ae ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 step n=2000 crc=c5aaa2d9 expect=c5aaa2d9 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_100 n=2000 crc=4b293b4a expect=4b293b4a ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_500 n=2000 crc=f911b31d expect=f911b31d ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_1000 n=2000 crc=e5dd82ed expect=e5dd82ed ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_2000 n=2000 crc=c08dc537 expect=c08dc537 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_3500 n=2000 crc=11f6145d expect=11f6145d ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 chirp n=2000 crc=274a48b0 expect=274a48b0 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 noise n=2000 crc=336c66d1 expect=336c66d1 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 square_fullscale n=2000 crc=3e10108b expect=3e10108b ok=1 cyc_min=746695 cyc_max=746717
+RESULT fir31_lp1000 silence n=2000 crc=3a8b93be expect=3a8b93be ok=1 cyc_min=746208 cyc_max=746230
+SUMMARY runs=22 failed=0
+ENV zephyr 4.4.2
+ENV board arduino_nano_33_ble (nRF52840, Cortex-M4F)
+ENV cpu_hz_measured 63983901
+BENCH 1 n=2000 vectors=11 sections=2 taps=31 reps=3
+ENV compiler 14.3.0
+ENV optimisation speed (-O1, -O2 or -O3; read the exact flag from the build)
+OVERHEAD cyc_min=18
+RESULT biquad2_lp1000 impulse n=2000 crc=e47e9d9b expect=e47e9d9b ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 step n=2000 crc=49049514 expect=49049514 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_100 n=2000 crc=57abedc9 expect=57abedc9 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_500 n=2000 crc=b74fc172 expect=b74fc172 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_1000 n=2000 crc=edcd3a96 expect=edcd3a96 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_2000 n=2000 crc=26a4cac9 expect=26a4cac9 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 sine_3500 n=2000 crc=931b1ebe expect=931b1ebe ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 chirp n=2000 crc=8f551f7e expect=8f551f7e ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 noise n=2000 crc=f6873b57 expect=f6873b57 ok=1 cyc_min=264117 cyc_max=264124
+RESULT biquad2_lp1000 square_fullscale n=2000 crc=03f120db expect=03f120db ok=1 cyc_min=265798 cyc_max=265805
+RESULT biquad2_lp1000 silence n=2000 crc=3a8b93be expect=3a8b93be ok=1 cyc_min=264117 cyc_max=264124
+RESULT fir31_lp1000 impulse n=2000 crc=a18162ae expect=a18162ae ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 step n=2000 crc=c5aaa2d9 expect=c5aaa2d9 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_100 n=2000 crc=4b293b4a expect=4b293b4a ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_500 n=2000 crc=f911b31d expect=f911b31d ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_1000 n=2000 crc=e5dd82ed expect=e5dd82ed ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_2000 n=2000 crc=c08dc537 expect=c08dc537 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 sine_3500 n=2000 crc=11f6145d expect=11f6145d ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 chirp n=2000 crc=274a48b0 expect=274a48b0 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 noise n=2000 crc=336c66d1 expect=336c66d1 ok=1 cyc_min=746208 cyc_max=746230
+RESULT fir31_lp1000 square_fullscale n=2000 crc=3e10108b expect=3e10108b ok=1 cyc_min=746695 cyc_max=746717
+RESULT fir31_lp1000 silence n=2000 crc=3a8b93be expect=3a8b93be ok=1 cyc_min=746208 cyc_max=746230
+SUMMARY runs=22 failed=0

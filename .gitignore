@@ -6,3 +6,4 @@ __pycache__/
 *.elf
 *.bin
 .venv/
+bench/zephyr/build/

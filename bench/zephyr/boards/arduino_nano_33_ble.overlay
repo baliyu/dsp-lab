@@ -1,0 +1,12 @@
+/* Console over USB (CDC ACM). The flash layout is the board's default: the app starts at 0x10000, behind the Arduino bootloader. */
+/ {
+	chosen {
+		zephyr,console = &cdc_acm_uart0;
+	};
+};
+
+&zephyr_udc0 {
+	cdc_acm_uart0: cdc_acm_uart0 {
+		compatible = "zephyr,cdc-acm-uart";
+	};
+};
