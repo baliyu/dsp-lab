@@ -82,7 +82,7 @@ def render_header() -> str:
 # ---- reading a log ----------------------------------------------------------------------------------------------------------------------
 
 RESULT = re.compile(r"^RESULT (\S+) (\S+) n=(\d+) crc=([0-9a-f]{8}) expect=([0-9a-f]{8}) ok=([01]) cyc_min=(\d+) cyc_max=(\d+)\s*$")
-BANNER = re.compile(r"^BENCH ([12]) n=(\d+) vectors=(\d+) sections=(\d+) taps=(\d+) reps=(\d+)(?: variants=(\d+))?\s*$")
+BANNER = re.compile(r"^BENCH ([12]) n=(\d+) vectors=(\d+) sections=(\d+) taps=(\d+) reps=(\d+)(?: variants=(\d+))?(?: cases=(\d+))?\s*$")
 SUMMARY = re.compile(r"^SUMMARY runs=(\d+) failed=(\d+)\s*$")
 OVERHEAD = re.compile(r"^OVERHEAD cyc_min=(\d+)\s*$")
 ENV = re.compile(r"^ENV (\S+) (.*?)\s*$")
@@ -91,7 +91,7 @@ MARKER = re.compile(r".(ENV |RESULT |BENCH |SUMMARY |OVERHEAD )")      # a secon
 
 class Run:
     def __init__(self, banner, version=1):
-        self.banner = banner                    # (n, vectors, sections, taps, reps, variants); variants is 0 in the old version-1 format
+        self.banner = banner                    # (n, vectors, sections, taps, reps, variants, cases); the last two are 0 where the log does not declare them
         self.version = version
         self.rows: list[tuple] = []
         self.overhead = None
@@ -112,7 +112,7 @@ def parse_log(text: str):
             ignored += 1
         elif m := BANNER.match(line):
             g = m.groups()
-            cur = Run(tuple(int(x) for x in g[1:6]) + (int(g[6] or 0),), version=int(g[0]))
+            cur = Run(tuple(int(x) for x in g[1:6]) + (int(g[6] or 0), int(g[7] or 0)), version=int(g[0]))
             runs.append(cur)
         elif m := ENV.match(line):
             env[m.group(1)] = m.group(2)
@@ -164,10 +164,8 @@ def check(text: str):
             labels = {variant_of(c) for c in cases}
             if len(labels) != r.banner[5]:
                 problems.append(f"{tag}: the banner declares {r.banner[5]} variant(s) but the results contain {len(labels)}: {sorted(labels)}")
-            for lab in labels:
-                for f in FILTERS:
-                    if f"{f}:{lab}" not in cases:
-                        problems.append(f"{tag}: variant '{lab}' has no {f} results")
+            if r.banner[6] and len(cases) != r.banner[6]:
+                problems.append(f"{tag}: the banner declares {r.banner[6]} cases but the results contain {len(cases)}")
             want = {(c, v) for c in cases for v in names}
         if set(seen) != want:
             problems.append(f"{tag}: missing {sorted(want - set(seen))[:4]} / unexpected {sorted(set(seen) - want)[:4]}")

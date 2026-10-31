@@ -53,6 +53,17 @@ For the filters used here (sums of absolute coefficient values in Q2.14 or Q15):
 The 50 Hz result is the same fact as the 361 LSB quantisation error below, seen from the other side: poles close to the unit circle need large coefficients, and large coefficients are what a narrow accumulator
 cannot take. The bound is for any `int16` inputs, not only the test vectors.
 
+### Restructured versions (same arithmetic, different loop order)
+
+Three further functions in `dsp32.c` compute exactly what `dsp32_biquad_cascade` and `dsp32_fir` compute, so they are bit-identical to the model under the same check:
+
+- `dsp32_biquad_blk` runs the block through one section at a time, holding that section's coefficients and state in local variables (each section is causal and independent, so the order does not change the result).
+- `dsp32_fir_lin` keeps the delay line as a linear history of the previous `taps - 1` inputs instead of a circular buffer, so the inner loop has no wrap test. Its state is not interchangeable with the circular versions' (it uses the same structure, all zero at the start), and its input and output must not overlap.
+- `dsp32_fir_sym` does the same for a symmetric FIR (`coefs[k] == coefs[taps-1-k]`, as a linear-phase design gives) and adds the two inputs that share a coefficient before multiplying, so it does about half the multiplies. It needs `dsp32_fir_sym_ok`
+  (symmetric and within the 65535 limit). The limit also covers the folded product: a coefficient that appears twice in the sum is at most 32767 in size, and 32767 x 65536 (the largest sum of two inputs) = 2,147,418,112 is below 2^31.
+
+Whether they are faster has to be measured; see [BENCH.md](BENCH.md).
+
 ## A limit cycle, found by measurement
 
 After an impulse the 1000 Hz low-pass never settles to zero: its output stays at **plus or minus 1 LSB** indefinitely (a known effect of rounding in

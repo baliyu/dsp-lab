@@ -75,15 +75,16 @@ def test_every_variant_filter_and_vector_is_reported_once_with_the_models_checks
     assert len(runs) == 1 and runs[0].version == 2
     exp = bench.expected()
     nvec = len(bench.config()[2])
-    assert len(runs[0].rows) == 2 * 4 * nvec and len({(r[0], r[1]) for r in runs[0].rows}) == len(runs[0].rows)
+    assert len(runs[0].rows) == 14 * nvec and len({(r[0], r[1]) for r in runs[0].rows}) == len(runs[0].rows)
     assert all(r[3] == exp[(bench.base_of(r[0]), r[1])] for r in runs[0].rows)           # every variant has the model's checksum
 
 
-def test_the_four_variants_are_declared_in_the_banner_and_present_for_both_filters(host_exe):
+def test_the_variants_and_cases_are_declared_in_the_banner(host_exe):
     runs, _, _ = bench.parse_log(run(host_exe).stdout)
-    assert runs[0].banner[5] == 4
-    assert {bench.variant_of(r[0]) for r in runs[0].rows} == {"acc64", "acc32", "acc64_O2", "acc32_O2"}
-    assert {bench.base_of(r[0]) for r in runs[0].rows} == set(bench.FILTERS)
+    assert runs[0].banner[5] == 8 and runs[0].banner[6] == 14               # 8 variants; 6 have both filters, 2 are FIR-only
+    labels = {bench.variant_of(r[0]) for r in runs[0].rows}
+    assert labels == {"acc64", "acc32", "opt32", "sym32", "acc64_O2", "acc32_O2", "opt32_O2", "sym32_O2"}
+    assert {bench.base_of(r[0]) for r in runs[0].rows if bench.variant_of(r[0]).startswith("sym32")} == {"fir31_lp1000"}     # the symmetric variants implement only the FIR
 
 
 def test_fake_counter_shows_exactly_two_reads_per_block_with_interrupts_masked_and_wrap_handled(host_exe):
@@ -109,7 +110,7 @@ def test_a_repeat_that_goes_wrong_once_is_reported_even_if_the_last_repeat_is_ri
 
 def test_the_log_checker_tolerates_terminal_noise_and_repeated_runs(host_exe):
     good = run(host_exe).stdout
-    noisy = "garbage before\r\n" + good.replace("\n", "\r\n") + "\r\nsome text\r\n" + good + "BENCH 2 n=2000 vectors=11 sections=2 taps=31 reps=3 variants=4\r\nRESULT cut off"
+    noisy = "garbage before\r\n" + good.replace("\n", "\r\n") + "\r\nsome text\r\n" + good + "BENCH 2 n=2000 vectors=11 sections=2 taps=31 reps=3 variants=8 cases=14\r\nRESULT cut off"
     problems, rep = bench.check(noisy)
     assert problems == [] and "2 complete run(s)" in rep[0]
 
@@ -156,7 +157,7 @@ def test_checker_catches_a_missing_or_duplicated_result(good_log):
 
 def test_checker_catches_a_summary_that_disagrees(good_log):
     assert bench.check(re.sub(r"failed=0", "failed=1", good_log))[0]
-    assert bench.check(re.sub(r"runs=88", "runs=87", good_log))[0]
+    assert bench.check(re.sub(r"runs=154", "runs=153", good_log))[0]
 
 
 def test_checker_rejects_a_log_without_a_complete_run(good_log):
@@ -239,7 +240,7 @@ def test_the_sketch_folder_and_its_ino_file_have_the_same_name_as_the_arduino_id
 def test_checker_catches_a_missing_variant(good_log):
     lines = [l for l in good_log.splitlines() if ":acc32_O2" not in l]
     problems, _ = bench.check("\n".join(lines) + "\n")
-    assert any("declares 4 variant" in p for p in problems) or any("runs=" in p for p in problems)
+    assert any("declares 8 variant" in p for p in problems)
 
 
 def test_checker_catches_a_wrong_checksum_in_the_32bit_variant(good_log):
@@ -248,10 +249,11 @@ def test_checker_catches_a_wrong_checksum_in_the_32bit_variant(good_log):
     assert any("acc32" in p and "model gives" in p for p in bench.check(mutate(good_log, line, bad))[0])
 
 
-def test_checker_catches_a_variant_that_has_only_one_of_the_two_filters(good_log):
-    lines = [l for l in good_log.splitlines() if not l.startswith("RESULT fir31_lp1000:acc64_O2 ")]
-    problems, _ = bench.check("\n".join(lines) + "\n")
-    assert any("has no fir31_lp1000 results" in p for p in problems)
+def test_checker_catches_a_missing_case_when_the_banner_declares_the_case_count(good_log):
+    lines = [l for l in good_log.splitlines() if not l.startswith("RESULT fir31_lp1000:acc32_O2 ")]
+    text = "\n".join(lines).replace("runs=154", "runs=143") + "\n"                 # SUMMARY agrees and every variant label is still present; only cases=14 disagrees
+    problems, _ = bench.check(text)
+    assert any("declares 14 cases" in p for p in problems)
 
 
 def test_the_committed_board_logs_still_pass_the_checker():
@@ -273,16 +275,16 @@ def test_the_32bit_variants_are_refused_for_coefficients_that_fail_the_check(tmp
     exe = build_host(tmp_path, srcs=[HOST_SRC[0], HOST_SRC[1], core / "dsp_o2.c", core / "dsp32_o2.c", core / "bench_core.c", HOST_SRC[5]])
     r = run(exe)
     assert r.returncode != 0
-    assert "SKIPPED biquad2_lp1000:acc32 " in r.stdout and "SKIPPED biquad2_lp1000:acc32_O2 " in r.stdout
+    assert all(f"SKIPPED biquad2_lp1000:{v} " in r.stdout for v in ("acc32", "acc32_O2", "opt32", "opt32_O2"))
     assert "SKIPPED fir31_lp1000" not in r.stdout                           # the FIR coefficients were not touched
     assert bench.check(r.stdout)[0]
 
 
 def test_the_banner_variant_count_is_checked_even_when_the_summary_is_adjusted_to_match(good_log):
     lines = [l for l in good_log.splitlines() if ":acc32_O2" not in l]
-    text = "\n".join(lines).replace("runs=88", "runs=66") + "\n"                 # the SUMMARY now agrees with the results; only the banner (variants=4) disagrees
+    text = "\n".join(lines).replace("runs=154", "runs=132") + "\n"                # the SUMMARY now agrees with the results; the banner (variants=8) disagrees
     problems, _ = bench.check(text)
-    assert any("declares 4 variant" in p for p in problems)
+    assert any("declares 8 variant" in p for p in problems)
 
 
 def test_the_o2_units_really_compile_differently_from_the_default_units(tmp_path):
@@ -293,3 +295,39 @@ def test_the_o2_units_really_compile_differently_from_the_default_units(tmp_path
         return int(out[0])
     assert text_size(ROOT / "c" / "dsp.c") != text_size(CORE / "dsp_o2.c")             # same source, built under -Os: only the pragma can make the code differ
     assert text_size(ROOT / "c" / "dsp32.c") != text_size(CORE / "dsp32_o2.c")
+
+
+EXPECTED_TABLE = {
+    # variant: (biquad, fir, biquad guard, fir guard)
+    "acc64": ("dsp_biquad_cascade", "dsp_fir", "none", "none"),
+    "acc32": ("dsp32_biquad_cascade", "dsp32_fir", "dsp32_biquad_ok", "dsp32_fir_ok"),
+    "opt32": ("dsp32_biquad_blk", "dsp32_fir_lin", "dsp32_biquad_ok", "dsp32_fir_ok"),
+    "sym32": ("none", "dsp32_fir_sym", "none", "dsp32_fir_sym_ok"),
+    "acc64_O2": ("dsp_o2_biquad_cascade", "dsp_o2_fir", "none", "none"),
+    "acc32_O2": ("dsp32_o2_biquad_cascade", "dsp32_o2_fir", "dsp32_biquad_ok", "dsp32_fir_ok"),
+    "opt32_O2": ("dsp32_o2_biquad_blk", "dsp32_o2_fir_lin", "dsp32_biquad_ok", "dsp32_fir_ok"),
+    "sym32_O2": ("none", "dsp32_o2_fir_sym", "none", "dsp32_fir_sym_ok"),
+}
+
+
+def test_every_variant_label_points_at_the_function_and_the_guard_it_names(host_exe):
+    table = {}
+    for line in run(host_exe, "table").stdout.splitlines():
+        m = re.match(r"VARIANT (\S+) bq=(\S+) fir=(\S+) bq_ok=(\S+) fir_ok=(\S+)$", line)
+        table[m.group(1)] = m.groups()[1:]
+    assert table == EXPECTED_TABLE                                         # a mislabelled variant would make a timing point at the wrong code
+
+
+def test_the_symmetric_variants_are_refused_for_a_coefficient_set_that_is_not_symmetric(tmp_path):
+    core = tmp_path / "core"
+    core.mkdir()
+    for f in CORE.iterdir():
+        (core / f.name).write_text(f.read_text())
+    header = (core / "bench_data.h").read_text()
+    assert "-39, -67, -68, 0, 156" in header
+    (core / "bench_data.h").write_text(header.replace("-39, -67, -68, 0, 156", "-39, -66, -68, 0, 156"))       # one tap no longer equals its mirror
+    exe = build_host(tmp_path, srcs=[HOST_SRC[0], HOST_SRC[1], core / "dsp_o2.c", core / "dsp32_o2.c", core / "bench_core.c", HOST_SRC[5]])
+    r = run(exe)
+    assert r.returncode != 0                                               # the model's checksums are for the original design, so the other variants fail too
+    assert "SKIPPED fir31_lp1000:sym32 " in r.stdout and "SKIPPED fir31_lp1000:sym32_O2 " in r.stdout
+    assert "SKIPPED fir31_lp1000:opt32 " not in r.stdout and "SKIPPED fir31_lp1000:acc32 " not in r.stdout       # the unfolded variants only need the sum limit

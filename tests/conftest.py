@@ -41,10 +41,15 @@ def lib(tmp_path_factory):
     L.dsp_fir.argtypes = [i16p, ctypes.POINTER(FState), i16p, i16p, ctypes.c_size_t]
     L.dsp32_biquad_cascade.argtypes = L.dsp_biquad_cascade.argtypes
     L.dsp32_fir.argtypes = L.dsp_fir.argtypes
+    L.dsp32_biquad_blk.argtypes = L.dsp_biquad_cascade.argtypes
+    L.dsp32_fir_lin.argtypes = L.dsp_fir.argtypes
+    L.dsp32_fir_sym.argtypes = L.dsp_fir.argtypes
     L.dsp32_biquad_ok.restype = ctypes.c_int
     L.dsp32_biquad_ok.argtypes = [ctypes.POINTER(Coefs), ctypes.c_size_t]
     L.dsp32_fir_ok.restype = ctypes.c_int
     L.dsp32_fir_ok.argtypes = [i16p, ctypes.c_size_t]
+    L.dsp32_fir_sym_ok.restype = ctypes.c_int
+    L.dsp32_fir_sym_ok.argtypes = [i16p, ctypes.c_size_t]
     L.Coefs, L.BState, L.FState = Coefs, BState, FState
     return L
 
@@ -56,9 +61,9 @@ def as_i16(a):
 
 class CascadeRunner:
     """Holds a cascade's coefficients and state in C memory, so blocks can be fed one after another."""
-    def __init__(self, lib, q, impl="dsp"):
+    def __init__(self, lib, q, impl="dsp", fn=None):
         self.lib, self.n = lib, len(q)
-        self.fn = getattr(lib, f"{impl}_biquad_cascade")                  # impl is "dsp" (64-bit accumulator) or "dsp32" (32-bit)
+        self.fn = getattr(lib, fn or f"{impl}_biquad_cascade")                  # impl is "dsp" (64-bit accumulator) or "dsp32" (32-bit)
         self.c = (lib.Coefs * self.n)(*[lib.Coefs(*s) for s in q])
         self.s = (lib.BState * self.n)()
         for i in range(self.n):
@@ -73,9 +78,9 @@ class CascadeRunner:
 
 
 class FirRunner:
-    def __init__(self, lib, coefs, dirty=False, impl="dsp"):
+    def __init__(self, lib, coefs, dirty=False, impl="dsp", fn=None):
         self.lib = lib
-        self.fn = getattr(lib, f"{impl}_fir")
+        self.fn = getattr(lib, fn or f"{impl}_fir")
         self.coefs, self.pc = as_i16(coefs)
         self.delay = (ctypes.c_int16 * len(coefs))()
         if dirty:                                          # garbage in the delay line: init must clear it

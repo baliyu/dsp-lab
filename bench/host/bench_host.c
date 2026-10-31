@@ -1,6 +1,7 @@
 /* The benchmark on the PC: used by the tests to check the benchmark logic (checksums, state clearing, timing calls) without a board.
      bench_host            real clock (nanoseconds stand in for cycles)
      bench_host flaky      the second checksum computed is wrong (a repeat that goes wrong once, then recovers)
+     bench_host table      prints which library function each variant points at (so a test can check the labels)
      bench_host fake       a counter that starts near the 32-bit wrap and moves 10 per read, and prints how often each platform call was made */
 #define _POSIX_C_SOURCE 199309L
 #define BENCH_O2_UNITS 1
@@ -13,6 +14,28 @@
 
 static unsigned n_cycles, n_lock, n_unlock;
 static uint32_t fake_now = 0xFFFFFF00u;
+#define ID(f) { #f, (void (*)(void))(f) }
+static const struct { const char *name; void (*p)(void); } known_fn[] = {
+    ID(dsp_biquad_cascade), ID(dsp_fir), ID(dsp32_biquad_cascade), ID(dsp32_fir), ID(dsp32_biquad_blk), ID(dsp32_fir_lin), ID(dsp32_fir_sym),
+    ID(dsp32_biquad_ok), ID(dsp32_fir_ok), ID(dsp32_fir_sym_ok),
+    ID(dsp_o2_biquad_cascade), ID(dsp_o2_fir), ID(dsp32_o2_biquad_cascade), ID(dsp32_o2_fir), ID(dsp32_o2_biquad_blk), ID(dsp32_o2_fir_lin), ID(dsp32_o2_fir_sym),
+};
+
+static const char *fn_name(void (*p)(void))
+{
+    if (p == 0) return "none";
+    for (size_t i = 0; i < sizeof known_fn / sizeof known_fn[0]; i++)
+        if (known_fn[i].p == p) return known_fn[i].name;
+    return "unknown";
+}
+
+static void print_table(void)
+{
+    for (size_t i = 0; i < BENCH_NVARIANTS; i++)
+        printf("VARIANT %s bq=%s fir=%s bq_ok=%s fir_ok=%s\n", bench_variants[i].name, fn_name((void (*)(void))bench_variants[i].bq),
+               fn_name((void (*)(void))bench_variants[i].fir), fn_name((void (*)(void))bench_variants[i].bq_ok), fn_name((void (*)(void))bench_variants[i].fir_ok));
+}
+
 static int fake_mode, flaky_mode;
 static unsigned n_crc;
 
@@ -53,6 +76,10 @@ static void emit(const char *line) { puts(line); }
 int main(int argc, char **argv)
 {
     static const bench_platform_t plat = { cycles, lock, unlock, crc32, emit };
+    if (argc > 1 && strcmp(argv[1], "table") == 0) {
+        print_table();
+        return 0;
+    }
     fake_mode = (argc > 1 && strcmp(argv[1], "fake") == 0);
     flaky_mode = (argc > 1 && strcmp(argv[1], "flaky") == 0);
     puts(fake_mode ? "ENV platform host PC, fake counter (10 per read), not cycles" : "ENV platform host PC, counter is nanoseconds, not cycles");

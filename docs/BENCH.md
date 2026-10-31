@@ -187,6 +187,7 @@ The benchmark now times a list of *variants* (`bench/core/bench_variants.h`) of 
 | `acc64` | `c/dsp.c`: the 64-bit accumulator, built at the build's default optimisation level (`-Os` in the Arduino IDE, `-O2` in the Zephyr app) |
 | `acc32` | `c/dsp32.c`: the 32-bit accumulator (specification and safety bound in [DESIGN.md](DESIGN.md)), at the default level |
 | `acc64_O2`, `acc32_O2` | the same two compiled at function-level `-O2` (`#pragma GCC optimize`, in `bench/core/dsp_o2.c` and `dsp32_o2.c`), Feather sketch and PC build only |
+| `opt32`, `sym32`, `opt32_O2`, `sym32_O2` | added in stage 4b below: the restructured loops (`opt32`: biquad section by section and FIR with a linear history; `sym32`: FIR only, folded for a symmetric design) at both levels |
 
 The pass condition is unchanged: **every variant must give the model's checksum on every vector**. A 32-bit variant is refused (a `SKIPPED` line, counted as a failure) if the coefficients fail the safety check.
 `python -m dsp_lab.bench check` prints, for each filter, the mean cycles per sample of every variant and its ratio to `acc64`.
@@ -232,4 +233,26 @@ What was checked before any board run (sandbox and CI; no board):
 
 To run it on the Feather: upload `bench/feather/dsp_bench_feather/dsp_bench_feather.ino` as in stage 3. One pass now takes roughly 20 to 30 seconds (estimated, not measured), so capture 120 seconds to
 `bench/logs/feather_run2.log` and check it. The Nano app also runs `acc64` and `acc32` (at its `-O2`) but has not been re-flashed with this version.
+
+### Stage 4b: restructured loops: harness built, **not yet run on a board**
+
+Eight variants and 14 cases now (the banner reads `variants=8 cases=14`; a log that declares its case count is checked against it, and `feather_run2.log` and the older logs, which do not, still pass):
+
+| New variant | Biquad | FIR |
+|---|---|---|
+| `opt32` | section by section, state in locals (`dsp32_biquad_blk`) | linear history, no circular wrap (`dsp32_fir_lin`) |
+| `sym32` | not implemented | linear history, symmetric pairs folded (`dsp32_fir_sym`) |
+| `opt32_O2`, `sym32_O2` | as above, built at function-level `-O2` | |
+
+What the stage 4 result suggests, and what is not known: the 32-bit FIR costs about 35 cycles per tap at `-Os`, and my expectation is that much of that is the per-tap circular-buffer test and the index arithmetic, which `opt32` and `sym32` remove.
+I have not looked at the compiled code on the Feather, so this is a hypothesis to test, not a result; there are no timings for these variants yet.
+
+Conditions: the same safety check as `acc32` (the sum of the absolute coefficients, at most 65535); `sym32` also needs a symmetric coefficient set, and the benchmark refuses to run it (a `SKIPPED` line) if the set is not symmetric. The linear-history FIR versions do
+not support in-place processing and keep a different state layout; neither matters to the benchmark, which uses separate buffers and clears the state before every repeat.
+
+Checked before any board run: 227 tests pass; the new functions equal the model for whole blocks and for data fed in uneven chunks (1 to 100 samples, because the state layout changed), for random coefficient sets and tap counts from 1 to 33 with extreme inputs, and at the worst-case
+limit; a test pins each variant label to the function and the guard it names; 26 further deliberate bugs in the new code, the benchmark core and the checker, run by hand in my sandbox: all caught (two needed new tests first, because a mislabelled or unguarded variant changes no output);
+the four variants available to the Nano app ran on an emulated Cortex-M0 at `-Os` and `-O2` with every checksum matching the model; the Feather sketch compiles against the real Adafruit core; the Nano app builds. QEMU says nothing about timing.
+
+To run it: upload the Feather sketch as before (`bench/feather/dsp_bench_feather/dsp_bench_feather.ino`); one pass takes longer now, so capture 150 seconds to `bench/logs/feather_run3.log` and check it with `python -m dsp_lab.bench check`.
 

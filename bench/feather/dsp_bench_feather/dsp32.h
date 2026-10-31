@@ -26,6 +26,21 @@ void dsp32_biquad_cascade(const dsp_biquad_coefs_t *c, dsp_biquad_state_t *state
 int16_t dsp32_fir_step(const int16_t *coefs, dsp_fir_state_t *s, int16_t x);
 void dsp32_fir(const int16_t *coefs, dsp_fir_state_t *state, const int16_t *in, int16_t *out, size_t n);
 
+/* ---- restructured versions (stage 4): the same arithmetic in a different loop order, so the output is bit-identical to dsp32_* (and so to dsp.c) under the same condition ----
+
+   dsp32_biquad_blk: processes the block one section at a time, with that section's coefficients and state held in local variables. Needs dsp32_biquad_ok. in and out may be the same array.
+
+   dsp32_fir_lin: keeps the delay line as a linear history (the previous taps-1 inputs, oldest first, in delay[0 .. taps-2]) instead of a circular buffer, so the inner loop has no wrap test.
+   Its state is NOT interchangeable with dsp_fir's or dsp32_fir's (dsp_fir_init gives a valid all-zero start for it). in and out must not overlap. Needs dsp32_fir_ok.
+
+   dsp32_fir_sym: as dsp32_fir_lin, and for a symmetric FIR (coefs[k] == coefs[taps-1-k], as for a linear-phase design) it adds the two inputs that share a coefficient before multiplying,
+   so it does about half the multiplies. Needs dsp32_fir_sym_ok: symmetric AND within the dsp32_fir_ok limit. The limit also keeps each folded product inside int32: a coefficient that is
+   counted twice in the sum is at most 32767 in size, and 32767 x 65536 (the largest sum of two inputs) = 2,147,418,112 < 2^31. in and out must not overlap. */
+int dsp32_fir_sym_ok(const int16_t *coefs, size_t taps);
+void dsp32_biquad_blk(const dsp_biquad_coefs_t *c, dsp_biquad_state_t *state, size_t sections, const int16_t *in, int16_t *out, size_t n);
+void dsp32_fir_lin(const int16_t *coefs, dsp_fir_state_t *state, const int16_t *in, int16_t *out, size_t n);
+void dsp32_fir_sym(const int16_t *coefs, dsp_fir_state_t *state, const int16_t *in, int16_t *out, size_t n);
+
 #ifdef __cplusplus
 }
 #endif

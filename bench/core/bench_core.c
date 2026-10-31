@@ -57,13 +57,12 @@ static unsigned run_kind(const bench_platform_t *p, int kind, const char *base, 
     char fname[64];
     int allowed = 1;
 
+    if ((kind == KIND_BIQUAD ? (const void *)var->bq : (const void *)var->fir) == 0) return 0;      /* this variant does not implement this filter */
     (void)snprintf(fname, sizeof fname, "%s:%s", base, var->name);
     if (kind == KIND_BIQUAD) {
-        if (var->bq == 0) allowed = 0;
-        else if (var->bq_ok != 0 && !var->bq_ok(bq_coefs, BENCH_SECTIONS)) allowed = 0;
+        if (var->bq_ok != 0 && !var->bq_ok(bq_coefs, BENCH_SECTIONS)) allowed = 0;
     } else {
-        if (var->fir == 0) allowed = 0;
-        else if (var->fir_ok != 0 && !var->fir_ok(fir_coefs, BENCH_TAPS)) allowed = 0;
+        if (var->fir_ok != 0 && !var->fir_ok(fir_coefs, BENCH_TAPS)) allowed = 0;
     }
     if (!allowed) {
         say(p, "SKIPPED %s reason=not_allowed_for_these_coefficients", fname);
@@ -97,7 +96,7 @@ static unsigned run_kind(const bench_platform_t *p, int kind, const char *base, 
 
 int bench_run(const bench_platform_t *p, unsigned reps, const bench_variant_t *variants, size_t nvariants)
 {
-    unsigned runs = 0, failed = 0;
+    unsigned runs = 0, failed = 0, cases = 0;
     uint32_t omin = 0xFFFFFFFFu;
 
     if (reps == 0) reps = 1;
@@ -110,8 +109,12 @@ int bench_run(const bench_platform_t *p, unsigned reps, const bench_variant_t *v
     }
     memcpy(fir_coefs, bench_fir_coefs, sizeof fir_coefs);
 
-    say(p, "BENCH 2 n=%u vectors=%u sections=%u taps=%u reps=%u variants=%u", (unsigned)BENCH_N, (unsigned)BENCH_NVEC, (unsigned)BENCH_SECTIONS,
-        (unsigned)BENCH_TAPS, reps, (unsigned)nvariants);
+    for (size_t i = 0; i < nvariants; i++) {
+        if (variants[i].bq != 0) cases++;
+        if (variants[i].fir != 0) cases++;
+    }
+    say(p, "BENCH 2 n=%u vectors=%u sections=%u taps=%u reps=%u variants=%u cases=%u", (unsigned)BENCH_N, (unsigned)BENCH_NVEC, (unsigned)BENCH_SECTIONS,
+        (unsigned)BENCH_TAPS, reps, (unsigned)nvariants, cases);
 #if defined(__VERSION__)
     say(p, "ENV compiler %s", __VERSION__);
 #endif

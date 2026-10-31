@@ -17,7 +17,7 @@ typedef struct {
     void (*emit)(const char *line);                             /* one finished line of text, no newline */
 } bench_platform_t;
 
-/* One implementation of both filters. bq and fir process a whole block from the state they are given. bq_ok / fir_ok, if not NULL, say whether the coefficients are allowed for
+/* One implementation of the filters. bq and fir process a whole block from the state they are given; either may be NULL if the variant implements only the other filter. bq_ok / fir_ok, if not NULL, say whether the coefficients are allowed for
    this implementation (the 32-bit accumulator is exact only for some coefficients); a variant that is not allowed is not run and counts as a failure. */
 typedef struct {
     const char *name;

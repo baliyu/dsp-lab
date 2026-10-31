@@ -6,4 +6,8 @@
 #define dsp32_biquad_cascade dsp32_o2_biquad_cascade
 #define dsp32_fir_step dsp32_o2_fir_step
 #define dsp32_fir dsp32_o2_fir
+#define dsp32_fir_sym_ok dsp32_o2_fir_sym_ok
+#define dsp32_biquad_blk dsp32_o2_biquad_blk
+#define dsp32_fir_lin dsp32_o2_fir_lin
+#define dsp32_fir_sym dsp32_o2_fir_sym
 #include "dsp32.c"
