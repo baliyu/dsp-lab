@@ -207,3 +207,19 @@ def test_two_lines_glued_inside_a_complete_run_make_the_check_fail(good_log):
 def test_a_missing_log_file_gives_a_plain_message_and_exit_code_2(capsys, tmp_path):
     assert bench.main(["bench", "check", str(tmp_path / "nope.log")]) == 2
     assert "cannot read the log file" in capsys.readouterr().out
+
+
+# ---- stage 3: the Arduino sketch folder for the Feather M0 -------------------------------------------------------------------------------------
+
+SKETCH = ROOT / "bench" / "feather" / "dsp_bench_feather"
+SKETCH_COPIES = {"dsp.c": ROOT / "c" / "dsp.c", "dsp.h": ROOT / "c" / "dsp.h", "bench_core.c": ROOT / "bench" / "core" / "bench_core.c",
+                 "bench_core.h": ROOT / "bench" / "core" / "bench_core.h", "bench_data.h": ROOT / "bench" / "core" / "bench_data.h"}
+
+
+@pytest.mark.parametrize("name", list(SKETCH_COPIES))
+def test_the_sketch_folder_holds_exact_copies_of_the_sources(name):
+    assert (SKETCH / name).read_text() == SKETCH_COPIES[name].read_text(), "run: PYTHONPATH=python python -m dsp_lab.feather_sketch"
+
+
+def test_the_sketch_folder_and_its_ino_file_have_the_same_name_as_the_arduino_ide_requires():
+    assert (SKETCH / (SKETCH.name + ".ino")).is_file()
