@@ -7,6 +7,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "dsp.h"
+
 typedef struct {
     uint32_t (*cycles)(void);                                   /* free-running 32-bit counter; differences are taken with unsigned arithmetic */
     unsigned (*irq_lock)(void);                                 /* mask interrupts; the timed block runs with them masked */
@@ -15,8 +17,18 @@ typedef struct {
     void (*emit)(const char *line);                             /* one finished line of text, no newline */
 } bench_platform_t;
 
-/* Runs everything `reps` times per block and emits the log lines that python/dsp_lab/bench.py checks. Returns the number of blocks whose
-   checksum differed from the expected one (0 = every output bit-identical to the model). Assumes a little-endian machine. */
-int bench_run(const bench_platform_t *p, unsigned reps);
+/* One implementation of both filters. bq and fir process a whole block from the state they are given. bq_ok / fir_ok, if not NULL, say whether the coefficients are allowed for
+   this implementation (the 32-bit accumulator is exact only for some coefficients); a variant that is not allowed is not run and counts as a failure. */
+typedef struct {
+    const char *name;
+    void (*bq)(const dsp_biquad_coefs_t *c, dsp_biquad_state_t *state, size_t sections, const int16_t *in, int16_t *out, size_t n);
+    void (*fir)(const int16_t *coefs, dsp_fir_state_t *state, const int16_t *in, int16_t *out, size_t n);
+    int (*bq_ok)(const dsp_biquad_coefs_t *c, size_t sections);
+    int (*fir_ok)(const int16_t *coefs, size_t taps);
+} bench_variant_t;
+
+/* Runs every variant of both filters on every vector, `reps` times per block, and emits the log lines that python/dsp_lab/bench.py checks. Returns the number of blocks
+   whose checksum differed from the expected one, plus the number not run (0 = every output bit-identical to the model). Assumes a little-endian machine. */
+int bench_run(const bench_platform_t *p, unsigned reps, const bench_variant_t *variants, size_t nvariants);
 
 #endif

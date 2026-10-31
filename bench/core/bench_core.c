@@ -43,17 +43,33 @@ static void prepare(int kind)
     memset(out_ram, 0x5A, sizeof out_ram);              /* a filter that wrote nothing must fail the checksum, not inherit the last block's output */
 }
 
-static void apply(int kind)
+static void apply(int kind, const bench_variant_t *var)
 {
     if (kind == KIND_BIQUAD)
-        dsp_biquad_cascade(bq_coefs, bq_state, BENCH_SECTIONS, in_ram, out_ram, BENCH_N);
+        var->bq(bq_coefs, bq_state, BENCH_SECTIONS, in_ram, out_ram, BENCH_N);
     else
-        dsp_fir(fir_coefs, &fir_state, in_ram, out_ram, BENCH_N);
+        var->fir(fir_coefs, &fir_state, in_ram, out_ram, BENCH_N);
 }
 
-static unsigned run_kind(const bench_platform_t *p, int kind, const char *fname, const uint32_t *expect, unsigned reps, unsigned *runs)
+static unsigned run_kind(const bench_platform_t *p, int kind, const char *base, const bench_variant_t *var, const uint32_t *expect, unsigned reps, unsigned *runs)
 {
     unsigned failed = 0;
+    char fname[64];
+    int allowed = 1;
+
+    (void)snprintf(fname, sizeof fname, "%s:%s", base, var->name);
+    if (kind == KIND_BIQUAD) {
+        if (var->bq == 0) allowed = 0;
+        else if (var->bq_ok != 0 && !var->bq_ok(bq_coefs, BENCH_SECTIONS)) allowed = 0;
+    } else {
+        if (var->fir == 0) allowed = 0;
+        else if (var->fir_ok != 0 && !var->fir_ok(fir_coefs, BENCH_TAPS)) allowed = 0;
+    }
+    if (!allowed) {
+        say(p, "SKIPPED %s reason=not_allowed_for_these_coefficients", fname);
+        *runs += BENCH_NVEC;
+        return BENCH_NVEC;
+    }
     for (size_t v = 0; v < BENCH_NVEC; v++) {
         uint32_t cmin = 0xFFFFFFFFu, cmax = 0, crc = 0;
         int ok = 1;
@@ -62,7 +78,7 @@ static unsigned run_kind(const bench_platform_t *p, int kind, const char *fname,
             prepare(kind);
             unsigned key = p->irq_lock();
             uint32_t c0 = p->cycles();
-            apply(kind);
+            apply(kind, var);
             uint32_t c1 = p->cycles();
             p->irq_unlock(key);
             uint32_t d = c1 - c0;
@@ -79,7 +95,7 @@ static unsigned run_kind(const bench_platform_t *p, int kind, const char *fname,
     return failed;
 }
 
-int bench_run(const bench_platform_t *p, unsigned reps)
+int bench_run(const bench_platform_t *p, unsigned reps, const bench_variant_t *variants, size_t nvariants)
 {
     unsigned runs = 0, failed = 0;
     uint32_t omin = 0xFFFFFFFFu;
@@ -94,8 +110,8 @@ int bench_run(const bench_platform_t *p, unsigned reps)
     }
     memcpy(fir_coefs, bench_fir_coefs, sizeof fir_coefs);
 
-    say(p, "BENCH 1 n=%u vectors=%u sections=%u taps=%u reps=%u", (unsigned)BENCH_N, (unsigned)BENCH_NVEC, (unsigned)BENCH_SECTIONS,
-        (unsigned)BENCH_TAPS, reps);
+    say(p, "BENCH 2 n=%u vectors=%u sections=%u taps=%u reps=%u variants=%u", (unsigned)BENCH_N, (unsigned)BENCH_NVEC, (unsigned)BENCH_SECTIONS,
+        (unsigned)BENCH_TAPS, reps, (unsigned)nvariants);
 #if defined(__VERSION__)
     say(p, "ENV compiler %s", __VERSION__);
 #endif
@@ -116,8 +132,10 @@ int bench_run(const bench_platform_t *p, unsigned reps)
     }
     say(p, "OVERHEAD cyc_min=%lu", (unsigned long)omin);
 
-    failed += run_kind(p, KIND_BIQUAD, BENCH_FILTER_BQ, bench_expect_bq, reps, &runs);
-    failed += run_kind(p, KIND_FIR, BENCH_FILTER_FIR, bench_expect_fir, reps, &runs);
+    for (size_t i = 0; i < nvariants; i++)
+        failed += run_kind(p, KIND_BIQUAD, BENCH_FILTER_BQ, &variants[i], bench_expect_bq, reps, &runs);
+    for (size_t i = 0; i < nvariants; i++)
+        failed += run_kind(p, KIND_FIR, BENCH_FILTER_FIR, &variants[i], bench_expect_fir, reps, &runs);
     say(p, "SUMMARY runs=%u failed=%u", runs, failed);
     return (int)failed;
 }

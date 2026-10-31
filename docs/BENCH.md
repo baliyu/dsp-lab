@@ -177,3 +177,32 @@ To run it: install the "Adafruit SAMD Boards" package in the Arduino IDE; open `
 (this overwrites whatever sketch is on the board). Close the Serial Monitor, then capture 35 seconds with the PowerShell block above, using the board's COM port and the file name
 `bench/logs/feather_run1.log`, and check it with `python -m dsp_lab.bench check`.
 
+## Stage 4: variants (32-bit accumulator, optimisation level): harness built, **not yet run on a board**
+
+The benchmark now times a list of *variants* (`bench/core/bench_variants.h`) of both filters, and the log names each case `<filter>:<variant>` (for example `fir31_lp1000:acc32`). The log banner is
+`BENCH 2 ... variants=N`; the older version-1 logs (`nano_run1.log`, `feather_run1.log`) are still read and still pass, and a test requires that.
+
+| Variant | What it is |
+|---|---|
+| `acc64` | `c/dsp.c`: the 64-bit accumulator, built at the build's default optimisation level (`-Os` in the Arduino IDE, `-O2` in the Zephyr app) |
+| `acc32` | `c/dsp32.c`: the 32-bit accumulator (specification and safety bound in [DESIGN.md](DESIGN.md)), at the default level |
+| `acc64_O2`, `acc32_O2` | the same two compiled at function-level `-O2` (`#pragma GCC optimize`, in `bench/core/dsp_o2.c` and `dsp32_o2.c`), Feather sketch and PC build only |
+
+The pass condition is unchanged: **every variant must give the model's checksum on every vector**. A 32-bit variant is refused (a `SKIPPED` line, counted as a failure) if the coefficients fail the safety check.
+`python -m dsp_lab.bench check` prints, for each filter, the mean cycles per sample of every variant and its ratio to `acc64`.
+
+The `-O2` variants are built with a pragma inside a program compiled at `-Os`; this is not the same as building the whole program at `-O2` (other compiler settings stay at `-Os`), and the GCC manual
+advises against the pragma for production code. It is used here because it lets one upload time both levels. The first thing to confirm in a result is therefore how the `_O2` variants compare with the Nano's real `-O2` build.
+
+What was checked before any board run (sandbox and CI; no board):
+
+- 155 tests pass (75 from stage 1; the rest cover the 32-bit variant and its limit, the benchmark and its checker, and the sketch folder). The 32-bit code equals the model on all test vectors for both low-pass filters and the FIR, on random
+  coefficient sets inside the limit with extreme inputs, and at the exact limit with the worst-case FIR input; the check rejects the 50 Hz DC blocker and the limit is exact on both sides.
+- All four variants run on the PC and equal the model. The 32-bit variants are refused when the coefficients are made unsafe.
+- 23 deliberate bugs in the new code, the benchmark core and the checker, run by hand in my sandbox (not a script in the repository): all caught. Two tests were added because the first round found that a variant-count check and
+  the `-O2` pragma were each protected only by something else.
+- The 32-bit and 64-bit code ran on an emulated Cortex-M0 (QEMU) at `-Os` and `-O2` with every checksum matching the model; the Feather sketch compiles against the real Adafruit SAMD core; the Nano app builds. QEMU says nothing about timing.
+
+To run it on the Feather: upload `bench/feather/dsp_bench_feather/dsp_bench_feather.ino` as in stage 3. One pass now takes roughly 20 to 30 seconds (estimated, not measured), so capture 120 seconds to
+`bench/logs/feather_run2.log` and check it. The Nano app also runs `acc64` and `acc32` (at its `-O2`) but has not been re-flashed with this version.
+

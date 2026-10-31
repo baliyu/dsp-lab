@@ -1,16 +1,19 @@
 /* dsp-lab stage 3, board side: Adafruit Feather M0 (ATSAMD21G18, Cortex-M0+, 48 MHz). Built with AI assistance (Claude).
 
-   Runs the same benchmark as the Nano 33 BLE (bench_core.c, dsp.c: the biquad cascade and the FIR over the 11 test vectors) and prints the same log lines
+   Runs the same benchmark as the Nano 33 BLE (bench_core.c: the biquad cascade and the FIR over the 11 test vectors, each with a 64-bit and a 32-bit accumulator, at the
+   default -Os and at function-level -O2) and prints the same log lines
    over USB serial, so python/dsp_lab/bench.py checks them in the same way. The Cortex-M0+ has no DWT cycle counter, so the cycles are counted by the
    SAMD21's 32-bit timer TC4+TC5 (32-bit mode), clocked from GCLK0 (the CPU clock, 48 MHz) with no prescaler: one count per CPU cycle. The count rate is checked
    at start against micros(), which comes from the core's own SysTick tick. The Cortex-M0+ has no 64-bit multiplier: the compiler calls a library routine (__aeabi_lmul).
 
-   The files next to this sketch (dsp.c, dsp.h, bench_core.c, bench_core.h, bench_data.h) are copies made by python/dsp_lab/feather_sketch.py from the files in
+   The files next to this sketch (dsp.c, dsp.h, dsp32.c, dsp32.h, dsp_o2.c, dsp32_o2.c, bench_core.c, bench_core.h, bench_variants.h, bench_data.h) are copies made by python/dsp_lab/feather_sketch.py from the files in
    c/ and bench/core/; a test fails if they differ. Open this folder in the Arduino IDE, board "Adafruit Feather M0 (SAMD21)". */
 #include <Arduino.h>
 
+#define BENCH_O2_UNITS 1                       /* also time dsp.c and dsp32.c built at function-level -O2 (see dsp_o2.c) */
 extern "C" {
 #include "bench_core.h"
+#include "bench_variants.h"
 }
 
 #define REPEATS 3u
@@ -107,6 +110,6 @@ void loop(void)
     Serial.print("ENV f_cpu_configured "); Serial.println((unsigned long)F_CPU);
     Serial.print("ENV timer_hz_vs_micros "); Serial.println((unsigned long)timer_hz);
     Serial.print("ENV arduino_define "); Serial.println((unsigned long)ARDUINO);
-    (void)bench_run(&plat, REPEATS);
+    (void)bench_run(&plat, REPEATS, bench_variants, BENCH_NVARIANTS);
     delay(PAUSE_BETWEEN_RUNS_MS);
 }

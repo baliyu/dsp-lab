@@ -82,7 +82,7 @@ def render_header() -> str:
 # ---- reading a log ----------------------------------------------------------------------------------------------------------------------
 
 RESULT = re.compile(r"^RESULT (\S+) (\S+) n=(\d+) crc=([0-9a-f]{8}) expect=([0-9a-f]{8}) ok=([01]) cyc_min=(\d+) cyc_max=(\d+)\s*$")
-BANNER = re.compile(r"^BENCH 1 n=(\d+) vectors=(\d+) sections=(\d+) taps=(\d+) reps=(\d+)\s*$")
+BANNER = re.compile(r"^BENCH ([12]) n=(\d+) vectors=(\d+) sections=(\d+) taps=(\d+) reps=(\d+)(?: variants=(\d+))?\s*$")
 SUMMARY = re.compile(r"^SUMMARY runs=(\d+) failed=(\d+)\s*$")
 OVERHEAD = re.compile(r"^OVERHEAD cyc_min=(\d+)\s*$")
 ENV = re.compile(r"^ENV (\S+) (.*?)\s*$")
@@ -90,8 +90,9 @@ MARKER = re.compile(r".(ENV |RESULT |BENCH |SUMMARY |OVERHEAD )")      # a secon
 
 
 class Run:
-    def __init__(self, banner):
-        self.banner = banner
+    def __init__(self, banner, version=1):
+        self.banner = banner                    # (n, vectors, sections, taps, reps, variants); variants is 0 in the old version-1 format
+        self.version = version
         self.rows: list[tuple] = []
         self.overhead = None
         self.summary = None
@@ -110,7 +111,8 @@ def parse_log(text: str):
         if MARKER.search(line):
             ignored += 1
         elif m := BANNER.match(line):
-            cur = Run(tuple(int(g) for g in m.groups()))
+            g = m.groups()
+            cur = Run(tuple(int(x) for x in g[1:6]) + (int(g[6] or 0),), version=int(g[0]))
             runs.append(cur)
         elif m := ENV.match(line):
             env[m.group(1)] = m.group(2)
@@ -128,32 +130,58 @@ def parse_log(text: str):
     return runs, env, ignored
 
 
+def base_of(case: str) -> str:
+    """'biquad2_lp1000:acc32' -> 'biquad2_lp1000'; version-1 logs have no variant suffix."""
+    return case.split(":", 1)[0]
+
+
+def variant_of(case: str) -> str:
+    return case.split(":", 1)[1] if ":" in case else ""
+
+
 def check(text: str):
     """Returns (problems, report_lines). No problems means every checksum matched the model in every complete run."""
     exp = expected()
     names = list(vectors.make_vectors(FS, N))
-    want = {(f, v) for f in FILTERS for v in names}
     runs, env, ignored = parse_log(text)
     problems: list[str] = []
     complete = [r for r in runs if r.summary is not None]
     if not complete:
         return ["no complete run in the log (no BENCH ... SUMMARY block)"], []
+    case_sets = []
     for i, r in enumerate(complete, 1):
         tag = f"run {i}"
         if r.banner[:4] != (N, len(names), SECTIONS, TAPS):
             problems.append(f"{tag}: banner {r.banner[:4]} does not match this repository's configuration {(N, len(names), SECTIONS, TAPS)}")
         seen = [(row[0], row[1]) for row in r.rows]
         if len(seen) != len(set(seen)):
-            problems.append(f"{tag}: a (filter, vector) pair appears twice")
+            problems.append(f"{tag}: a (case, vector) pair appears twice")
+        cases = sorted({row[0] for row in r.rows})
+        case_sets.append(cases)
+        if r.version == 1:
+            want = {(f, v) for f in FILTERS for v in names}
+        else:
+            labels = {variant_of(c) for c in cases}
+            if len(labels) != r.banner[5]:
+                problems.append(f"{tag}: the banner declares {r.banner[5]} variant(s) but the results contain {len(labels)}: {sorted(labels)}")
+            for lab in labels:
+                for f in FILTERS:
+                    if f"{f}:{lab}" not in cases:
+                        problems.append(f"{tag}: variant '{lab}' has no {f} results")
+            want = {(c, v) for c in cases for v in names}
         if set(seen) != want:
-            problems.append(f"{tag}: missing {sorted(want - set(seen))} / unexpected {sorted(set(seen) - want)}")
+            problems.append(f"{tag}: missing {sorted(want - set(seen))[:4]} / unexpected {sorted(set(seen) - want)[:4]}")
         for f, v, n, crc, e, ok, lo, hi in r.rows:
+            b = base_of(f)
+            if b not in FILTERS:
+                problems.append(f"{tag}: unknown filter '{f}'")
+                continue
             if n != N:
                 problems.append(f"{tag}: {f}/{v}: n={n}, expected {N}")
-            if (f, v) in exp and crc != exp[(f, v)]:
-                problems.append(f"{tag}: {f}/{v}: device crc {crc:08x} but the model gives {exp[(f, v)]:08x}")
-            if (f, v) in exp and e != exp[(f, v)]:
-                problems.append(f"{tag}: {f}/{v}: the device's embedded expectation {e:08x} differs from the model {exp[(f, v)]:08x} (stale header?)")
+            if (b, v) in exp and crc != exp[(b, v)]:
+                problems.append(f"{tag}: {f}/{v}: device crc {crc:08x} but the model gives {exp[(b, v)]:08x}")
+            if (b, v) in exp and e != exp[(b, v)]:
+                problems.append(f"{tag}: {f}/{v}: the device's embedded expectation {e:08x} differs from the model {exp[(b, v)]:08x} (stale header?)")
             if not ok:
                 problems.append(f"{tag}: {f}/{v}: the device itself reported ok=0")
             if lo > hi or lo == 0:
@@ -161,6 +189,8 @@ def check(text: str):
         runs_n, failed = r.summary
         if runs_n != len(r.rows) or failed != 0:
             problems.append(f"{tag}: SUMMARY says runs={runs_n} failed={failed}; {len(r.rows)} result lines")
+    if any(c != case_sets[0] for c in case_sets):
+        problems.append("the complete runs do not all contain the same set of cases")
     rep = []
     last = complete[-1]
     rep.append(f"{len(complete)} complete run(s) in the log; checksums {'ALL MATCH the model' if not problems else 'DO NOT ALL MATCH'}.")
@@ -171,15 +201,28 @@ def check(text: str):
         rep.append(f"  env {k}: {env[k]}")
     if last.overhead is not None:
         rep.append(f"  empty-region overhead (two counter reads): {last.overhead} cycles per measured block")
-    rep.append(f"  cycles per sample (minimum over {last.banner[4]} repeats; block of {N} samples; last run):")
-    for f in FILTERS:
-        rows = [row for row in last.rows if row[0] == f]
-        for row in rows:
-            rep.append(f"    {f:15s} {row[1]:17s} {row[6] / row[2]:8.2f}   (max over repeats {row[7] / row[2]:.2f})")
-        if rows:
-            rep.append(f"    {f:15s} {'mean of vectors':17s} {sum(r_[6] / r_[2] for r_ in rows) / len(rows):8.2f}")
-    if len(complete) > 1:
-        spread = max(abs(a[6] - b[6]) for a, b in zip(complete[0].rows, complete[-1].rows)) if len(complete[0].rows) == len(complete[-1].rows) else None
+    cases = sorted({row[0] for row in last.rows}, key=lambda c: [row[0] for row in last.rows].index(c))
+    if last.version == 1:
+        rep.append(f"  cycles per sample (minimum over {last.banner[4]} repeats; block of {N} samples; last run):")
+        for f in FILTERS:
+            rows = [row for row in last.rows if row[0] == f]
+            for row in rows:
+                rep.append(f"    {f:15s} {row[1]:17s} {row[6] / row[2]:8.2f}   (max over repeats {row[7] / row[2]:.2f})")
+            if rows:
+                rep.append(f"    {f:15s} {'mean of vectors':17s} {sum(r_[6] / r_[2] for r_ in rows) / len(rows):8.2f}")
+    else:
+        rep.append(f"  cycles per sample (minimum over {last.banner[4]} repeats, then mean / lowest / highest over the {len(names)} vectors; block of {N} samples; last run):")
+        base_mean: dict[str, float] = {}
+        for c in cases:
+            vals = [row[6] / row[2] for row in last.rows if row[0] == c]
+            mean = sum(vals) / len(vals)
+            first = variant_of(c) == variant_of(cases[0])
+            if first:
+                base_mean[base_of(c)] = mean
+            ratio = f"  {base_mean[base_of(c)] / mean:5.2f}x vs {variant_of(cases[0])}" if base_of(c) in base_mean and not first else ""
+            rep.append(f"    {c:26s} {mean:9.2f}  ({min(vals):.2f} to {max(vals):.2f}){ratio}")
+    if len(complete) > 1 and all(len(complete[0].rows) == len(r.rows) for r in complete):
+        spread = max(abs(a[6] - b[6]) for a, b in zip(complete[0].rows, complete[-1].rows))
         rep.append(f"  largest change in a block's minimum cycle count, first run to last run: {spread}")
     return problems, rep
 

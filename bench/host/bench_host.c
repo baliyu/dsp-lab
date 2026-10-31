@@ -3,7 +3,9 @@
      bench_host flaky      the second checksum computed is wrong (a repeat that goes wrong once, then recovers)
      bench_host fake       a counter that starts near the 32-bit wrap and moves 10 per read, and prints how often each platform call was made */
 #define _POSIX_C_SOURCE 199309L
+#define BENCH_O2_UNITS 1
 #include "bench_core.h"
+#include "bench_variants.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -54,7 +56,7 @@ int main(int argc, char **argv)
     fake_mode = (argc > 1 && strcmp(argv[1], "fake") == 0);
     flaky_mode = (argc > 1 && strcmp(argv[1], "flaky") == 0);
     puts(fake_mode ? "ENV platform host PC, fake counter (10 per read), not cycles" : "ENV platform host PC, counter is nanoseconds, not cycles");
-    int failed = bench_run(&plat, 3);
+    int failed = bench_run(&plat, 3, bench_variants, BENCH_NVARIANTS);
     if (fake_mode) printf("HOSTINFO cycles_calls=%u locks=%u unlocks=%u\n", n_cycles, n_lock, n_unlock);
     return failed ? 1 : 0;
 }

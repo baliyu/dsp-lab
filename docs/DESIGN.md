@@ -31,6 +31,28 @@ quantisation steps are larger relative to the signal. Choosing the split by sign
 
 The test bounds are about twice these measured worst cases (8, 45 and 720 LSB), so a regression shows up and ordinary variation does not.
 
+## The 32-bit accumulator variant (stage 4): `c/dsp32.c`
+
+The same filters with an `int32` accumulator instead of `int64`. Rounding, shifts, saturation, state and delay line are exactly those above; only the width of the sum changes. On a
+Cortex-M0+ (no 64-bit multiply) this removes the library call behind every `int64` product; the compiled code of `dsp32.c` makes no `__aeabi_lmul` call at all, where `dsp.c` makes 12 at `-Os`.
+
+It is **not** exact for every coefficient set. Samples are `int16`, so `|x|` and `|y|` are at most 32768, and the sum is at most 32768 x (sum of the absolute values of the coefficients) plus the rounding
+constant (2^13 for a biquad, 2^14 for the FIR). If the sum of absolute coefficient values (per biquad section; over all taps for the FIR) is at most **65535**, the largest possible sum is
+2,147,467,264, below 2^31 = 2,147,483,648, so no overflow occurs and the result equals the 64-bit result bit for bit. At 65536 it can overflow, which is undefined behaviour in C.
+`dsp32_biquad_ok` and `dsp32_fir_ok` test that condition; the benchmark refuses to run a 32-bit variant whose check fails, and the tests check the limit at both sides of the boundary.
+
+For the filters used here (sums of absolute coefficient values in Q2.14 or Q15):
+
+| Filter | Sum of absolute coefficients (per section for biquads) | 32-bit exact? |
+|---|---|---|
+| Butterworth low-pass 1000 Hz | 24,072 and 34,262 | yes |
+| Butterworth low-pass 300 Hz | 37,568 and 43,734 | yes |
+| 31-tap FIR | 45,221 | yes |
+| Butterworth high-pass 50 Hz (the DC blocker) | 110,710 and 112,033 | **no**: the check rejects it |
+
+The 50 Hz result is the same fact as the 361 LSB quantisation error below, seen from the other side: poles close to the unit circle need large coefficients, and large coefficients are what a narrow accumulator
+cannot take. The bound is for any `int16` inputs, not only the test vectors.
+
 ## A limit cycle, found by measurement
 
 After an impulse the 1000 Hz low-pass never settles to zero: its output stays at **plus or minus 1 LSB** indefinitely (a known effect of rounding in

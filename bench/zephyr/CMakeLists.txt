@@ -6,7 +6,8 @@ project(dsp_lab_bench)
 target_sources(app PRIVATE
     src/main.c
     ${CMAKE_CURRENT_LIST_DIR}/../core/bench_core.c
-    ${CMAKE_CURRENT_LIST_DIR}/../../c/dsp.c)
+    ${CMAKE_CURRENT_LIST_DIR}/../../c/dsp.c
+    ${CMAKE_CURRENT_LIST_DIR}/../../c/dsp32.c)
 target_include_directories(app PRIVATE
     ${CMAKE_CURRENT_LIST_DIR}/../core
     ${CMAKE_CURRENT_LIST_DIR}/../../c)

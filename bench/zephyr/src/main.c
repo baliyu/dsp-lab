@@ -12,6 +12,7 @@
 #include <cmsis_core.h>
 
 #include "bench_core.h"
+#include "bench_variants.h"
 
 #define REPEATS 3u
 #define PAUSE_BETWEEN_RUNS_S 10
@@ -91,7 +92,7 @@ int main(void)
 		printk("ENV zephyr %s\n", KERNEL_VERSION_STRING);
 		printk("ENV board arduino_nano_33_ble (nRF52840, Cortex-M4F)\n");
 		printk("ENV cpu_hz_measured %u\n", (unsigned)measure_cpu_hz());
-		(void)bench_run(&plat, REPEATS);
+		(void)bench_run(&plat, REPEATS, bench_variants, BENCH_NVARIANTS);
 		k_sleep(K_SECONDS(PAUSE_BETWEEN_RUNS_S));
 	}
 	return 0;

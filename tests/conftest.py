@@ -18,7 +18,7 @@ def lib(tmp_path_factory):
         pytest.skip("gcc is needed to build the C library")
     out = tmp_path_factory.mktemp("build") / "libdsp.so"
     subprocess.run(["gcc", "-std=c99", "-O2", "-Wall", "-Wextra", "-Werror", "-Wconversion", "-shared", "-fPIC",
-                    str(ROOT / "c" / "dsp.c"), "-o", str(out)], check=True)
+                    str(ROOT / "c" / "dsp.c"), str(ROOT / "c" / "dsp32.c"), "-o", str(out)], check=True)
     L = ctypes.CDLL(str(out))
 
     class Coefs(ctypes.Structure):
@@ -39,6 +39,12 @@ def lib(tmp_path_factory):
     L.dsp_fir_step.restype = ctypes.c_int16
     L.dsp_fir_step.argtypes = [i16p, ctypes.POINTER(FState), ctypes.c_int16]
     L.dsp_fir.argtypes = [i16p, ctypes.POINTER(FState), i16p, i16p, ctypes.c_size_t]
+    L.dsp32_biquad_cascade.argtypes = L.dsp_biquad_cascade.argtypes
+    L.dsp32_fir.argtypes = L.dsp_fir.argtypes
+    L.dsp32_biquad_ok.restype = ctypes.c_int
+    L.dsp32_biquad_ok.argtypes = [ctypes.POINTER(Coefs), ctypes.c_size_t]
+    L.dsp32_fir_ok.restype = ctypes.c_int
+    L.dsp32_fir_ok.argtypes = [i16p, ctypes.c_size_t]
     L.Coefs, L.BState, L.FState = Coefs, BState, FState
     return L
 
@@ -50,8 +56,9 @@ def as_i16(a):
 
 class CascadeRunner:
     """Holds a cascade's coefficients and state in C memory, so blocks can be fed one after another."""
-    def __init__(self, lib, q):
+    def __init__(self, lib, q, impl="dsp"):
         self.lib, self.n = lib, len(q)
+        self.fn = getattr(lib, f"{impl}_biquad_cascade")                  # impl is "dsp" (64-bit accumulator) or "dsp32" (32-bit)
         self.c = (lib.Coefs * self.n)(*[lib.Coefs(*s) for s in q])
         self.s = (lib.BState * self.n)()
         for i in range(self.n):
@@ -61,13 +68,14 @@ class CascadeRunner:
         xin, pin = as_i16(x)
         out = np.zeros_like(xin)
         _, pout = as_i16(out)
-        self.lib.dsp_biquad_cascade(self.c, self.s, self.n, pin, pout, len(xin))
+        self.fn(self.c, self.s, self.n, pin, pout, len(xin))
         return out
 
 
 class FirRunner:
-    def __init__(self, lib, coefs, dirty=False):
+    def __init__(self, lib, coefs, dirty=False, impl="dsp"):
         self.lib = lib
+        self.fn = getattr(lib, f"{impl}_fir")
         self.coefs, self.pc = as_i16(coefs)
         self.delay = (ctypes.c_int16 * len(coefs))()
         if dirty:                                          # garbage in the delay line: init must clear it
@@ -80,5 +88,5 @@ class FirRunner:
         xin, pin = as_i16(x)
         out = np.zeros_like(xin)
         _, pout = as_i16(out)
-        self.lib.dsp_fir(self.pc, ctypes.byref(self.state), pin, pout, len(xin))
+        self.fn(self.pc, ctypes.byref(self.state), pin, pout, len(xin))
         return out
