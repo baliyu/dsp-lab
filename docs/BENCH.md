@@ -1,7 +1,7 @@
 # Stage 2: the benchmark on the Arduino Nano 33 BLE (Cortex-M4F)
 
-Built with AI assistance (Claude). **Status: the harness has run on one Nano 33 BLE.** The output was bit-identical to the model in every complete run, and the
-first cycle counts are below. The log of that run is committed as `bench/logs/nano_run1.log`.
+Built with AI assistance (Claude). **Status: the harness has run on one Nano 33 BLE (stage 2) and one Feather M0 (stage 3).** The output was bit-identical to the model in every complete
+run on both, and the first cycle counts are below. The logs are committed as `bench/logs/nano_run1.log` and `bench/logs/feather_run1.log`.
 
 ## What it does
 
@@ -126,12 +126,12 @@ minimum cycle count of every block is identical from the first complete run to t
 ## Not yet verified
 
 - One run on one board. The DWT counter and the USB console worked in that run; the cause of the capture gaps above is open.
-- Nothing has run on the Cortex-M0+ yet (stage 3), and no optimisation has been measured (stage 4).
+- No optimisation has been measured yet (stage 4).
 
-## Stage 3: Adafruit Feather M0 (Cortex-M0+, ATSAMD21G18, 48 MHz): harness built, **not yet run on the board**
+## Stage 3: Adafruit Feather M0 (Cortex-M0+, ATSAMD21G18, 48 MHz)
 
 The same benchmark and log format, as an Arduino sketch in `bench/feather/dsp_bench_feather/` (the C files in that folder are copies of `c/` and `bench/core/`, made by
-`python/dsp_lab/feather_sketch.py`; a test fails if they differ). No cycle counts for this board exist yet.
+`python/dsp_lab/feather_sketch.py`; a test fails if they differ). The first result is below.
 
 What differs from the Nano run, and why it matters:
 
@@ -143,13 +143,35 @@ What differs from the Nano run, and why it matters:
   comparison between the two boards therefore mixes the core and the flags; the log's `ENV optimisation` line shows which one the board build used.
 - Interrupts are masked (PRIMASK) during each timed block, as on the Nano. SysTick is left alone.
 
-What was checked before any board run (in my sandbox, not in CI):
+### First result (one board, one run of the sketch, 31 October 2026)
+
+Log: `bench/logs/feather_run1.log`: 4 complete runs (88 output blocks), **every one with the model's CRC-32**. Unlike the Nano capture this one is clean: it starts at the start of a run,
+ends on a `SUMMARY` line, and has no damaged lines. The minimum cycle count of every block is identical from the first run to the last, and the maximum over the 3 repeats equals the minimum.
+
+| Filter | Cycles per sample (minimum of 3 repeats, mean of the 11 vectors) | Range over the vectors |
+|---|---|---|
+| Biquad cascade, 2 sections | **1038.4** | 1032.06 (`step`, `silence`) to 1042.56 (`square_fullscale`) |
+| FIR, 31 taps | **3485.1** | 3472.06 (`silence`) to 3494.86 (`square_fullscale`) |
+
+- Derived, not measured separately: at 48 MHz that is about 21.6 us per sample for the biquad cascade and 72.6 us for the FIR, which is about **17% and 58%** of the 125 us between samples at 8 kHz,
+  for the filter code alone.
+- The time depends slightly on the data (about 1% for the biquad, 0.6% for the FIR). The likely cause is the library routine behind each `int64` product, which is not constant-time; I have not tested that.
+- Timer: the TC4+TC5 count rate was 48,001,069 per second against `micros()`. Both come from the same CPU clock, so this shows the counter runs at the clock the core configured; it is not an independent
+  measurement of that clock. Counter overhead: 50 cycles per block (a read needs a synchronisation wait), which does not matter at 2000 samples.
+- Build, as printed by the sketch: GCC 9.2.1 (the arm-none-eabi-gcc of the Arduino IDE's Adafruit SAMD package), `-Os` (the core's own flags, which I read from its `platform.txt`; the log's
+  optimisation line confirms size optimisation), `F_CPU` 48 MHz.
+- **Compared with the Nano (not a like-for-like comparison):** about 7.9 times the cycles for the biquad cascade and 9.3 times for the FIR. The two builds differ in more than the core: GCC 9.2.1 at `-Os`
+  here against GCC 14.3.0 at `-O2` on the Nano, and the Cortex-M0+ has no 64-bit multiplier, so each product is a library call. How much of the ratio comes from each of these has not been separated; that is
+  what stage 4 is for.
+- Not shown by this run: other boards, other compiler flags, interrupts running, inputs read from flash instead of RAM, any other clock speed, or a comparison with another implementation.
+
+What was checked before the board run (in my sandbox, not in CI):
 
 - The sketch and its C files compile against the real Adafruit SAMD core headers with the core's own compiler flags (no errors; the CMSIS core headers used are from the Zephyr module, not the exact
   version the IDE ships). Nothing was linked, because the core was not built.
 - The same `bench_core.c` and `dsp.c` ran on an emulated Cortex-M0 (QEMU `microbit`), built with Zephyr at both `-Os` and `-O2`: all 22 checksums matched the model in each build. This checks the
   arithmetic on ARMv6-M code with the library multiply; it says nothing about timing or the SAMD21's timer.
-- Not tested at all: the timer register code (`TC4`/`TC5`), the USB serial output, and the upload.
+- Not tested before the board run: the timer register code (`TC4`/`TC5`), the USB serial output, and the upload. All three worked in the first run.
 
 To run it: install the "Adafruit SAMD Boards" package in the Arduino IDE; open `bench/feather/dsp_bench_feather/dsp_bench_feather.ino`; choose the board "Adafruit Feather M0 (SAMD21)" and its port; Upload
 (this overwrites whatever sketch is on the board). Close the Serial Monitor, then capture 35 seconds with the PowerShell block above, using the board's COM port and the file name
