@@ -1,7 +1,7 @@
 # Stage 2: the benchmark on the Arduino Nano 33 BLE (Cortex-M4F)
 
 Built with AI assistance (Claude). **Status: the harness has run on one Nano 33 BLE (stage 2) and one Feather M0 (stages 3 and 4).** The output was bit-identical to the model in every complete
-run on both, and the first cycle counts are below. The logs are committed as `bench/logs/nano_run1.log`, `bench/logs/feather_run1.log` and `bench/logs/feather_run2.log`.
+run on both, and the first cycle counts are below. The logs are committed as `bench/logs/nano_run1.log`, `bench/logs/feather_run1.log`, `bench/logs/feather_run2.log` and `bench/logs/feather_run3.log`.
 
 ## What it does
 
@@ -234,7 +234,7 @@ What was checked before any board run (sandbox and CI; no board):
 To run it on the Feather: upload `bench/feather/dsp_bench_feather/dsp_bench_feather.ino` as in stage 3. One pass now takes roughly 20 to 30 seconds (estimated, not measured), so capture 120 seconds to
 `bench/logs/feather_run2.log` and check it. The Nano app also runs `acc64` and `acc32` (at its `-O2`) but has not been re-flashed with this version.
 
-### Stage 4b: restructured loops: harness built, **not yet run on a board**
+### Stage 4b: restructured loops
 
 Eight variants and 14 cases now (the banner reads `variants=8 cases=14`; a log that declares its case count is checked against it, and `feather_run2.log` and the older logs, which do not, still pass):
 
@@ -244,13 +244,49 @@ Eight variants and 14 cases now (the banner reads `variants=8 cases=14`; a log t
 | `sym32` | not implemented | linear history, symmetric pairs folded (`dsp32_fir_sym`) |
 | `opt32_O2`, `sym32_O2` | as above, built at function-level `-O2` | |
 
-What the stage 4 result suggests, and what is not known: the 32-bit FIR costs about 35 cycles per tap at `-Os`, and my expectation is that much of that is the per-tap circular-buffer test and the index arithmetic, which `opt32` and `sym32` remove.
-I have not looked at the compiled code on the Feather, so this is a hypothesis to test, not a result; there are no timings for these variants yet.
+#### First result (Feather M0, one run of the sketch, 31 October 2026)
+
+Log: `bench/logs/feather_run3.log`: 4 complete runs, 616 output blocks (14 cases x 11 vectors x 4 runs), **every one with the model's CRC-32**. The fifth run in the file is cut off by the end of the 150-second capture; no lines are damaged.
+The minimum cycle count of every block is identical from the first complete run to the last.
+
+Cycles per sample (minimum of 3 repeats; mean of the 11 vectors; the lowest to highest vector is under 1% apart except for `acc64`); the ratio is to `acc64` in the same run:
+
+| Biquad cascade, 2 sections | cycles | vs `acc64` |
+|---|---|---|
+| `acc64` | 1019.2 | 1.00x |
+| `acc32` | 244.0 | 4.18x |
+| `opt32` (section by section) | 158.3 | 6.44x |
+| `acc64_O2` | 1007.0 | 1.01x |
+| `acc32_O2` | 247.3 | 4.12x |
+| `opt32_O2` | **126.3** | **8.07x** |
+
+| FIR, 31 taps | cycles | vs `acc64` |
+|---|---|---|
+| `acc64` | 3453.5 | 1.00x |
+| `acc32` | 1087.0 | 3.18x |
+| `opt32` (linear history) | 764.3 | 4.52x |
+| `sym32` (linear, folded) | 526.6 | 6.56x |
+| `acc64_O2` | 2857.6 | 1.21x |
+| `acc32_O2` | 563.2 | 6.13x |
+| `opt32_O2` | 449.0 | 7.69x |
+| `sym32_O2` | **389.9** | **8.86x** |
+
+- **Section-by-section biquad:** 35% fewer cycles than `acc32` at `-Os` (244 to 158) and 49% fewer at `-O2` (247 to 126). The plain 32-bit cascade gained nothing from `-O2`; the restructured one gains a lot.
+- **Linear-history FIR:** 30% fewer cycles than `acc32` at `-Os` (1087 to 764) and 20% fewer at `-O2` (563 to 449); about 25 and 14.5 cycles per tap, against 35 and 18. My expectation that the circular-buffer test accounted for much of the 35 cycles per tap was only
+  partly right: removing it saves 20 to 30%, and most of the cost remains. I have not looked at the compiled code, so I cannot say where.
+- **Symmetric folding:** 31% fewer cycles than `opt32` at `-Os` (764 to 527) and 13% fewer at `-O2` (449 to 390). It does 16 multiply steps instead of 31 but takes far more than half the time, about 33 cycles per step at `-Os` and 24 at `-O2`.
+  It applies only to a symmetric design that passes `dsp32_fir_sym_ok`.
+- **Best against the starting point (`acc64`, same run):** the biquad cascade needs 8.1 times fewer cycles and the FIR 8.9 times fewer. At 48 MHz and for the filter code alone that is from 21.2 us (17% of the 125 us between samples at 8 kHz) to 2.6 us (2.1%) for the biquad,
+  and from 72.0 us (58%) to 8.1 us (6.5%) for the FIR.
+- **Against the Nano** (its stage 2 `-O2` build of the 64-bit code, 132.1 and 373.1 cycles): the best Feather variants use 0.96 and 1.04 times those cycles. Not like-for-like: the Nano has not run any of the 32-bit or restructured variants, and the compilers and `-O2`
+  mechanisms differ.
+- **Repeatability:** `acc32`, `acc32_O2` and the 64-bit FIR measured identically to stage 4's run (`feather_run2.log`), although this is a different program; the 64-bit biquad differed by 0.1%.
+- The `_O2` rows are function-level `-O2` inside an `-Os` program, as explained above. The guards were not exercised in this run (every set of coefficients was allowed). Timer, overhead (48 cycles per block), masked interrupts and data in RAM are as before.
 
 Conditions: the same safety check as `acc32` (the sum of the absolute coefficients, at most 65535); `sym32` also needs a symmetric coefficient set, and the benchmark refuses to run it (a `SKIPPED` line) if the set is not symmetric. The linear-history FIR versions do
 not support in-place processing and keep a different state layout; neither matters to the benchmark, which uses separate buffers and clears the state before every repeat.
 
-Checked before any board run: 227 tests pass; the new functions equal the model for whole blocks and for data fed in uneven chunks (1 to 100 samples, because the state layout changed), for random coefficient sets and tap counts from 1 to 33 with extreme inputs, and at the worst-case
+Checked before the board run: 227 tests pass; the new functions equal the model for whole blocks and for data fed in uneven chunks (1 to 100 samples, because the state layout changed), for random coefficient sets and tap counts from 1 to 33 with extreme inputs, and at the worst-case
 limit; a test pins each variant label to the function and the guard it names; 26 further deliberate bugs in the new code, the benchmark core and the checker, run by hand in my sandbox: all caught (two needed new tests first, because a mislabelled or unguarded variant changes no output);
 the four variants available to the Nano app ran on an emulated Cortex-M0 at `-Os` and `-O2` with every checksum matching the model; the Feather sketch compiles against the real Adafruit core; the Nano app builds. QEMU says nothing about timing.
 
