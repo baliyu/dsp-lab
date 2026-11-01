@@ -1,7 +1,7 @@
 # Stage 2: the benchmark on the Arduino Nano 33 BLE (Cortex-M4F)
 
 Built with AI assistance (Claude). **Status: the harness has run on one Nano 33 BLE (stage 2) and one Feather M0 (stages 3 and 4).** The output was bit-identical to the model in every complete
-run on both, and the first cycle counts are below. The logs are committed as `bench/logs/nano_run1.log`, `bench/logs/feather_run1.log`, `bench/logs/feather_run2.log` and `bench/logs/feather_run3.log`.
+run on both, and the first cycle counts are below. The logs are committed as `bench/logs/nano_run1.log`, `bench/logs/feather_run1.log`, `bench/logs/feather_run2.log`, `bench/logs/feather_run3.log` and `bench/logs/nano_run2.log`.
 
 ## What it does
 
@@ -278,8 +278,8 @@ Cycles per sample (minimum of 3 repeats; mean of the 11 vectors; the lowest to h
   It applies only to a symmetric design that passes `dsp32_fir_sym_ok`.
 - **Best against the starting point (`acc64`, same run):** the biquad cascade needs 8.1 times fewer cycles and the FIR 8.9 times fewer. At 48 MHz and for the filter code alone that is from 21.2 us (17% of the 125 us between samples at 8 kHz) to 2.6 us (2.1%) for the biquad,
   and from 72.0 us (58%) to 8.1 us (6.5%) for the FIR.
-- **Against the Nano** (its stage 2 `-O2` build of the 64-bit code, 132.1 and 373.1 cycles): the best Feather variants use 0.96 and 1.04 times those cycles. Not like-for-like: the Nano has not run any of the 32-bit or restructured variants, and the compilers and `-O2`
-  mechanisms differ.
+- **Against the Nano** (its stage 2 `-O2` build of the 64-bit code, 132.1 and 373.1 cycles): the best Feather variants use 0.96 and 1.04 times those cycles. Not like-for-like: the Nano had not yet run any of the 32-bit or restructured variants, and the compilers and `-O2`
+  mechanisms differ. **Superseded by Stage 4c below, which runs the same variants on the Nano.**
 - **Repeatability:** `acc32`, `acc32_O2` and the 64-bit FIR measured identically to stage 4's run (`feather_run2.log`), although this is a different program; the 64-bit biquad differed by 0.1%.
 - The `_O2` rows are function-level `-O2` inside an `-Os` program, as explained above. The guards were not exercised in this run (every set of coefficients was allowed). Timer, overhead (48 cycles per block), masked interrupts and data in RAM are as before.
 
@@ -291,4 +291,37 @@ limit; a test pins each variant label to the function and the guard it names; 26
 the four variants available to the Nano app ran on an emulated Cortex-M0 at `-Os` and `-O2` with every checksum matching the model; the Feather sketch compiles against the real Adafruit core; the Nano app builds. QEMU says nothing about timing.
 
 To run it: upload the Feather sketch as before (`bench/feather/dsp_bench_feather/dsp_bench_feather.ino`); one pass takes longer now, so capture 150 seconds to `bench/logs/feather_run3.log` and check it with `python -m dsp_lab.bench check`.
+
+### Stage 4c: the same variants on the Nano 33 BLE (Cortex-M4F)
+
+Log: `bench/logs/nano_run2.log`: 5 complete runs, every block with the model's CRC-32, no damaged lines; the minimum cycle count of every block is identical from the first run to the last. The Nano app runs four variants (`acc64`, `acc32`, `opt32`, `sym32`) at the
+Zephyr build's `-O2` (GCC 14.3.0, Zephyr 4.4.2, `CONFIG_SPEED_OPTIMIZATIONS=y`); there are no `_O2` rows because the default build is already `-O2`. CPU clock measured against the RTC: 63.98 MHz. Overhead: 18 cycles per block.
+
+Cycles per sample (minimum of 3 repeats; mean of the 11 vectors); the ratio is to `acc64` in the same run. The last two columns compare with the Feather's default (`-Os`) rows from `feather_run3.log`; the flags are not the same.
+
+| Case | Nano cycles | vs `acc64` | Feather cycles | Feather / Nano |
+|---|---|---|---|---|
+| Biquad `acc64` | 133.9 | 1.00x | 1019.2 | 7.6x |
+| Biquad `acc32` | 87.2 | 1.54x | 244.0 | 2.8x |
+| Biquad `opt32` | **50.3** | **2.66x** | 158.3 | 3.1x |
+| FIR `acc64` | 376.1 | 1.00x | 3453.5 | 9.2x |
+| FIR `acc32` | 361.1 | 1.04x | 1087.0 | 3.0x |
+| FIR `opt32` | 269.8 | 1.39x | 764.3 | 2.8x |
+| FIR `sym32` | **201.1** | **1.87x** | 526.6 | 2.6x |
+
+- At 63.98 MHz, for the filter code alone at 8 kHz: the biquad cascade goes from 2.09 us per sample (1.7% of the 125 us between samples) to 0.79 us (0.63%); the FIR from 5.88 us (4.7%) to 3.14 us (2.5%). The best Feather variants take 2.6 us and 8.1 us.
+- Against the Feather's function-level `-O2` rows the best variants differ by 2.5 times (biquad, 126.3 against 50.3 cycles) and 1.9 times (FIR, 389.9 against 201.1). I have not separated how much of the remaining gap is the core and how much is the compiler and flags.
+- The 64-bit baseline measured 1.4% (biquad) and 0.8% (FIR) higher than in stage 2 (132.1 and 373.1): the same source and flags in a different program. Differences of 1 to 2% are not meaningful.
+
+Predictions written down before the run, and how they scored (I did not say what the savings in predictions 2 and 3 were measured against, so both readings are shown):
+
+| Prediction | Result | Verdict |
+|---|---|---|
+| The 32-bit accumulator changes little (within about 10%) because the M4 has a 64-bit multiply-accumulate | FIR 4.0% fewer cycles; biquad 34.9% fewer (1.54x) | Right for the FIR, wrong for the biquad |
+| The section-by-section biquad saves 15 to 35% | 42.3% fewer than `acc32`; 62.5% fewer than `acc64` | Wrong: the saving is larger than predicted on either reading |
+| The folded FIR saves 25 to 45% | 25.5% fewer than `opt32`; 44.3% fewer than `acc32`; 46.5% fewer than `acc64` | Right against the previous variants, just above the range against `acc64` |
+
+- The 64-bit accumulator is not free on the Cortex-M4F for the biquad: the 32-bit version is 1.54 times faster, where I expected little change. I have not looked at why. One possibility, not tested, is the extra instructions to shift and saturate a 64-bit sum.
+- For the FIR the accumulator width hardly matters (4%): the per-tap loop dominates at about 11.6 cycles per tap (`acc32`) and 8.7 (`opt32`), and the folded version costs about 12.6 cycles per step over 16 steps.
+- Same limits as before: one board, one run of the program, interrupts masked, data in RAM, and the 32-bit variants exact only under the checked coefficient bound.
 
