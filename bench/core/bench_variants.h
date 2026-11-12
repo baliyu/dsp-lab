@@ -23,6 +23,12 @@ void dsp32_o2_fir_lin(const int16_t *coefs, dsp_fir_state_t *state, const int16_
 void dsp32_o2_fir_sym(const int16_t *coefs, dsp_fir_state_t *state, const int16_t *in, int16_t *out, size_t n);
 #endif
 
+#if defined(BENCH_CPP) && BENCH_CPP
+void cpp_biquad_acc64(const dsp_biquad_coefs_t *c, dsp_biquad_state_t *state, size_t sections, const int16_t *in, int16_t *out, size_t n);
+void cpp_biquad_acc32(const dsp_biquad_coefs_t *c, dsp_biquad_state_t *state, size_t sections, const int16_t *in, int16_t *out, size_t n);
+void cpp_biquad_blk32(const dsp_biquad_coefs_t *c, dsp_biquad_state_t *state, size_t sections, const int16_t *in, int16_t *out, size_t n);
+#endif
+
 static const bench_variant_t bench_variants[] = {
     { "acc64", dsp_biquad_cascade, dsp_fir, 0, 0 },
     { "acc32", dsp32_biquad_cascade, dsp32_fir, dsp32_biquad_ok, dsp32_fir_ok },
@@ -33,6 +39,11 @@ static const bench_variant_t bench_variants[] = {
     { "acc32_O2", dsp32_o2_biquad_cascade, dsp32_o2_fir, dsp32_biquad_ok, dsp32_fir_ok },
     { "opt32_O2", dsp32_o2_biquad_blk, dsp32_o2_fir_lin, dsp32_biquad_ok, dsp32_fir_ok },
     { "sym32_O2", 0, dsp32_o2_fir_sym, 0, dsp32_fir_sym_ok },
+#endif
+#if defined(BENCH_CPP) && BENCH_CPP
+    { "cpp64", cpp_biquad_acc64, 0, 0, 0 },
+    { "cpp32", cpp_biquad_acc32, 0, dsp32_biquad_ok, 0 },
+    { "cpp32blk", cpp_biquad_blk32, 0, dsp32_biquad_ok, 0 },
 #endif
 };
 #define BENCH_NVARIANTS (sizeof bench_variants / sizeof bench_variants[0])
