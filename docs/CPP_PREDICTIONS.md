@@ -29,3 +29,6 @@ The Nano and Feather builds use different compilers and flags. An abstraction ma
 ## Scorecard
 
 To be filled in after measuring. Every miss goes in.
+
+### Result 6 (12 November 2026): HIT
+g++ -std=c++17 with -Wall -Wextra -Werror -Wconversion. The LP1000 sections compile on int32. HP50 section 1 on int32 is rejected by the static_assert; on int64 it compiles. Limit: one compiler, compile-time check only. Predictions 1 to 5 and 7 are not yet tested.
