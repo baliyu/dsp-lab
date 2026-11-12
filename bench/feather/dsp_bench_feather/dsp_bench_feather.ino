@@ -11,6 +11,7 @@
 #include <Arduino.h>
 
 #define BENCH_O2_UNITS 1                       /* also time dsp.c and dsp32.c built at function-level -O2 (see dsp_o2.c) */
+#define BENCH_CPP 1                            /* also time the C++ variants of the biquad (dsp_rt.cpp) */
 extern "C" {
 #include "bench_core.h"
 #include "bench_variants.h"

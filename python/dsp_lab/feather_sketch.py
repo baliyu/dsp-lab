@@ -13,7 +13,8 @@ SKETCH = ROOT / "bench" / "feather" / "dsp_bench_feather"
 COPIES = {"dsp.c": ROOT / "c" / "dsp.c", "dsp.h": ROOT / "c" / "dsp.h", "dsp32.c": ROOT / "c" / "dsp32.c", "dsp32.h": ROOT / "c" / "dsp32.h",
           "dsp_o2.c": ROOT / "bench" / "core" / "dsp_o2.c", "dsp32_o2.c": ROOT / "bench" / "core" / "dsp32_o2.c",
           "bench_core.c": ROOT / "bench" / "core" / "bench_core.c", "bench_core.h": ROOT / "bench" / "core" / "bench_core.h",
-          "bench_variants.h": ROOT / "bench" / "core" / "bench_variants.h", "bench_data.h": ROOT / "bench" / "core" / "bench_data.h"}
+          "bench_variants.h": ROOT / "bench" / "core" / "bench_variants.h", "bench_data.h": ROOT / "bench" / "core" / "bench_data.h",
+          "dsp_rt.cpp": ROOT / "cpp" / "dsp_rt.cpp"}
 
 
 def main() -> int:
