@@ -4,7 +4,6 @@
 #include <cstdint>
 #include "dsp.h"
 
-#define DSP_RT_NOINLINE_STEP 1  // EXPERIMENT RUN: remove this line to restore the default
 // Experiment switch: define DSP_RT_NOINLINE_STEP to stop the compiler inlining step() (off by default).
 #ifdef DSP_RT_NOINLINE_STEP
 #define DSP_RT_STEP_ATTR __attribute__((noinline))
