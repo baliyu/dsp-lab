@@ -46,3 +46,17 @@ Changed kBiquadShift from 14 to 13 in cpp/dsp.hpp. tests/test_cpp.py: 30 failed,
 - Predicted a clean git tree before the edit; it was already modified (the shift had been applied in a terminal that was then closed). The AI first guessed line-ending noise, which was wrong.
 - The AI said requirements.txt was pinned; it is not, so the new venv took the newest versions.
 - The AI's grep pattern for showing the diff matched nothing.
+
+### Results on the host and the Feather M0 (12 November 2026)
+Host PC build with BENCH_CPP: 11 variants, 17 cases, runs=187 failed=0, all 33 cpp result lines ok=1. Predicted, HIT.
+Feather M0 (log bench/logs/feather_run4.log, 4 complete runs, checker PASS, every output CRC matches the model). Predicted bit-exact, HIT.
+Cycles per sample, 2-section biquad, last run, compared with the C variants in the same run:
+- cpp64 947.19 against acc64 1040.42 (-9.0%). Predicted within 3%. MISS (faster).
+- cpp32 215.44 against acc32 244.03 (-11.7%). Predicted within 3%. MISS (faster).
+- cpp32blk 152.45 against opt32 158.33 (-3.7%). Predicted within 3%. MISS (narrowly, faster).
+The cause of the speed difference is not known. Not yet looked at: the C++ compile flags in the Arduino core, the generated code, and whether the C++ build still calls __aeabi_lmul (prediction 5). Flash size (prediction 7) has no baseline yet. Limits: one board, one run, the table shows the last of 4 runs.
+
+### More misses
+- dsp_rt.cpp line count: predicted 76, actual 88.
+- Predicted no pytest failures after editing bench_variants.h. One failed, because the sketch folder must hold an exact copy.
+- Predicted the three C++ cycle counts within 3% of the C ones. All three were faster.
