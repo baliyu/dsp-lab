@@ -74,3 +74,16 @@ Cycles per sample, 2-section biquad, last run, against the C variants in the sam
 - cpp32 235.07 against acc32 244.03 (-3.7%). Predicted within 3%. MISS, narrowly. About 69% of the run4 gain is gone; a 3.7% gap remains, cause unknown.
 - cpp32blk 152.45 against opt32 158.33 (-3.7%), the same as run4. Predicted unchanged. HIT. This variant does not call step, so its gap is not explained by inlining either.
 Conclusion, limited: inlining of step explains the whole int64 gain and most of the int32 per-sample gain. The remaining 3.7% in both int32 C++ variants is unexplained. Limits: one board, one run, flash size of this build not recorded.
+
+### Results on the Nano 33 BLE (12 November 2026)
+Log bench/logs/nano_run3.log, 5 complete runs, checker PASS, every output CRC matches the model (GCC 14.3.0, speed optimisation). Cycles per sample, 2-section biquad, against the C variants in the same run:
+- cpp64 133.54 against acc64 133.94 (-0.3%). Predicted within 3%. HIT.
+- cpp32 82.20 against acc32 87.19 (-5.7%). Predicted within 3%. MISS (faster), cause unknown.
+- cpp32blk 50.07 against opt32 50.28 (-0.4%). Predicted within 3%. HIT.
+Flash (prediction 7): Nano image 105428 bytes against 104548 for the earlier C-only build, +880 bytes (+0.84%). Predicted within +5%. HIT, rough: whole images built at different times. Prediction 5 (no lmul calls) was about the Cortex-M0+ and was only checked on compiler output, not on the board.
+Limits: one Nano, one run of the program. Not looked at: the Nano disassembly. The Zephyr build now enables the C++ variants by default (BENCH_CPP in bench/zephyr/CMakeLists.txt).
+
+### More misses
+- I accepted the Arduino USB vendor ID and a SAMD21 banner as proof of the Nano, and made up a claim that the Nano bootloader emulates SAMD21. The board on COM16 was an MKR WAN 1310 (USB ID 2341:0059). Four erase attempts failed on it and nothing was written, as far as the output showed. The right check was the device line of bossac -i, which says nRF52840 for the Nano.
+- Predicted a flash offset problem, wrong.
+- Predicted three flash attempts would succeed (60%, 35%, 60%): all failed, on the wrong board.
