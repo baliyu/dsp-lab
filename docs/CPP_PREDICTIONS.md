@@ -38,3 +38,11 @@ tests/test_cpp.py: 34 passed. The C++ biquad (LP1000 on int32 and int64, HP50 on
 
 ### Misses so far
 - biquad_wrap.cpp line count: predicted 38, actual 32. A miscount by the AI, no effect on the result.
+
+### Result 1b (12 November 2026): HIT, test checked by breaking the code
+Changed kBiquadShift from 14 to 13 in cpp/dsp.hpp. tests/test_cpp.py: 30 failed, 4 passed (test_vector_count and the three silence cases, as predicted: all-zero input gives all-zero output whatever the shift). Restored with git restore; 34 passed again. Limit: one deliberate bug only. Run in a new venv (numpy 2.5.4, scipy 1.18.1, pytest 9.2.0, Python 3.13); versions may differ from the old venv.
+
+### More misses
+- Predicted a clean git tree before the edit; it was already modified (the shift had been applied in a terminal that was then closed). The AI first guessed line-ending noise, which was wrong.
+- The AI said requirements.txt was pinned; it is not, so the new venv took the newest versions.
+- The AI's grep pattern for showing the diff matched nothing.
