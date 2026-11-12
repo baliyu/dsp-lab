@@ -66,3 +66,11 @@ Compiled with the board's own compiler (GCC 9.2.1, arm-none-eabi 9-2019q4) and t
 Function sizes (instruction lines, approximate, they include literal pool data): the C cascade is 37 lines and calls a separate 107-line step function (64-bit) or 52-line step function (32-bit). The C++ variants hold the step inside one function (127 lines for acc64, 88 for acc32). So the C version probably pays a function call per section per sample and the C++ version does not. This fits the order of the gaps (cpp64 -9.0%, cpp32 -11.7%, cpp32blk -3.7%, and cpp32blk is 112 lines like the C block version). It is NOT proved.
 Test to settle it, not yet run: mark the C++ step noinline, rebuild, rerun on the board. Prediction: cpp32 returns to within 3% of the C acc32.
 Limit: line counts are not cycle counts.
+
+### Experiment: C++ step() not inlined (12 November 2026)
+Code: DSP_RT_NOINLINE_STEP defined at the top of cpp/dsp_rt.cpp (committed in this state with the log, then removed in the next commit). Log: bench/logs/feather_run5.log, 4 complete runs, checker PASS, every output CRC matches the model.
+Cycles per sample, 2-section biquad, last run, against the C variants in the same run:
+- cpp64 1035.42 against acc64 1038.42 (-0.3%). Predicted within 3%. HIT. With the inlining removed, the 9% gain of run4 is gone.
+- cpp32 235.07 against acc32 244.03 (-3.7%). Predicted within 3%. MISS, narrowly. About 69% of the run4 gain is gone; a 3.7% gap remains, cause unknown.
+- cpp32blk 152.45 against opt32 158.33 (-3.7%), the same as run4. Predicted unchanged. HIT. This variant does not call step, so its gap is not explained by inlining either.
+Conclusion, limited: inlining of step explains the whole int64 gain and most of the int32 per-sample gain. The remaining 3.7% in both int32 C++ variants is unexplained. Limits: one board, one run, flash size of this build not recorded.

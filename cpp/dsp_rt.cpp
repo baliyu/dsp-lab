@@ -4,6 +4,14 @@
 #include <cstdint>
 #include "dsp.h"
 
+#define DSP_RT_NOINLINE_STEP 1  // EXPERIMENT RUN: remove this line to restore the default
+// Experiment switch: define DSP_RT_NOINLINE_STEP to stop the compiler inlining step() (off by default).
+#ifdef DSP_RT_NOINLINE_STEP
+#define DSP_RT_STEP_ATTR __attribute__((noinline))
+#else
+#define DSP_RT_STEP_ATTR
+#endif
+
 namespace {
 
 template <typename Acc>
@@ -15,7 +23,7 @@ inline int16_t sat16(Acc v)
 }
 
 template <typename Acc>
-inline int16_t step(const dsp_biquad_coefs_t &c, dsp_biquad_state_t &s, int16_t x)
+DSP_RT_STEP_ATTR inline int16_t step(const dsp_biquad_coefs_t &c, dsp_biquad_state_t &s, int16_t x)
 {
     const Acc acc = static_cast<Acc>(c.b0) * x + static_cast<Acc>(c.b1) * s.x1 + static_cast<Acc>(c.b2) * s.x2
                   - static_cast<Acc>(c.a1) * s.y1 - static_cast<Acc>(c.a2) * s.y2;
