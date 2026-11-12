@@ -60,3 +60,9 @@ The cause of the speed difference is not known. Not yet looked at: the C++ compi
 - dsp_rt.cpp line count: predicted 76, actual 88.
 - Predicted no pytest failures after editing bench_variants.h. One failed, because the sketch folder must hold an exact copy.
 - Predicted the three C++ cycle counts within 3% of the C ones. All three were faster.
+
+### Why the C++ is faster on the Feather: first look (12 November 2026)
+Compiled with the board's own compiler (GCC 9.2.1, arm-none-eabi 9-2019q4) and the Arduino core flags (-Os; C as gnu11, C++ as gnu++11 with -fno-rtti -fno-exceptions). Flags are not the cause: both use -Os. The number of 64-bit multiply call sites is not the cause: 5 in dsp_biquad_step, 5 in cpp_biquad_acc64. Predicted equal, HIT.
+Function sizes (instruction lines, approximate, they include literal pool data): the C cascade is 37 lines and calls a separate 107-line step function (64-bit) or 52-line step function (32-bit). The C++ variants hold the step inside one function (127 lines for acc64, 88 for acc32). So the C version probably pays a function call per section per sample and the C++ version does not. This fits the order of the gaps (cpp64 -9.0%, cpp32 -11.7%, cpp32blk -3.7%, and cpp32blk is 112 lines like the C block version). It is NOT proved.
+Test to settle it, not yet run: mark the C++ step noinline, rebuild, rerun on the board. Prediction: cpp32 returns to within 3% of the C acc32.
+Limit: line counts are not cycle counts.
