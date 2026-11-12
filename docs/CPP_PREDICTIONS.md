@@ -32,3 +32,9 @@ To be filled in after measuring. Every miss goes in.
 
 ### Result 6 (12 November 2026): HIT
 g++ -std=c++17 with -Wall -Wextra -Werror -Wconversion. The LP1000 sections compile on int32. HP50 section 1 on int32 is rejected by the static_assert; on int64 it compiles. Limit: one compiler, compile-time check only. Predictions 1 to 5 and 7 are not yet tested.
+
+### Result 1 (12 November 2026): HIT
+tests/test_cpp.py: 34 passed. The C++ biquad (LP1000 on int32 and int64, HP50 on int64) equals the integer model bit for bit on all 11 vectors. Limits: x86 g++ only, per-sample version only, HP50 on int32 cannot be built (the static_assert refuses it). The test has not yet been checked by breaking the code on purpose.
+
+### Misses so far
+- biquad_wrap.cpp line count: predicted 38, actual 32. A miscount by the AI, no effect on the result.
