@@ -325,3 +325,28 @@ Predictions written down before the run, and how they scored (I did not say what
 - For the FIR the accumulator width hardly matters (4%): the per-tap loop dominates at about 11.6 cycles per tap (`acc32`) and 8.7 (`opt32`), and the folded version costs about 12.6 cycles per step over 16 steps.
 - Same limits as before: one board, one run of the program, interrupts masked, data in RAM, and the 32-bit variants exact only under the checked coefficient bound.
 
+
+## Stage 6: C++ biquad variants (Feather M0 only)
+
+Built with AI assistance (Claude). Predictions were written before any C++ code, in [CPP_PREDICTIONS.md](CPP_PREDICTIONS.md); every miss is listed there.
+
+What was added: three C++ variants of the 2-section biquad cascade, in `cpp/dsp_rt.cpp`, with the same function shape as the C variants (run-time coefficients, the same C state structure), switched on in the benchmark by the `BENCH_CPP` macro. `cpp64` mirrors `acc64`, `cpp32` mirrors `acc32`, and `cpp32blk` mirrors `opt32`. The default build and its 43 benchmark tests are unchanged. A separate header, `cpp/dsp.hpp`, has a version with the coefficients fixed at compile time, where a `static_assert` refuses a 32-bit accumulator when the sum of absolute coefficient values is over 65535 (the 50 Hz DC blocker is refused, the 1000 Hz low-pass is accepted). That header is checked on the PC only, for bit-exactness against the model, and is not in the board benchmark.
+
+### Result (Feather M0, ATSAMD21G18, 48 MHz, GCC 9.2.1 at -Os, 4 complete runs per log)
+
+Logs: `bench/logs/feather_run4.log` (default C++ build) and `bench/logs/feather_run5.log` (C++ `step` function marked not inlined). The checker passes both: every output block has the model's CRC-32. Cycles per sample, minimum over 3 repeats, mean over the 11 vectors, last run in each log:
+
+| Variant | C version, same run | C++, run 4 | C++, run 5 (step not inlined) |
+|---|---|---|---|
+| 64-bit accumulator | `acc64` 1040.42 (run 5: 1038.42) | `cpp64` 947.19 (-9.0%) | 1035.42 (-0.3%) |
+| 32-bit accumulator | `acc32` 244.03 | `cpp32` 215.44 (-11.7%) | 235.07 (-3.7%) |
+| 32-bit, section by section | `opt32` 158.33 | `cpp32blk` 152.45 (-3.7%) | 152.45 (-3.7%) |
+
+### What the measurements show, and what they do not
+
+- All three C++ variants are bit-identical to the model on all 11 vectors, on the PC and on the board.
+- The C++ is faster than the C on the Feather, which I did not predict (all three cycle predictions, "within 3% of the C version", missed). The generated code, read with the board's own compiler, shows the likely reason: the C cascade calls a separate `dsp_biquad_step` function for every section of every sample, and the C++ templates let the compiler put the step inside the loop. With the step marked not inlined (run 5), the 64-bit variant is within 0.3% of the C version, so inlining explains all of that gain. For the 32-bit per-sample variant, not inlining removes about 69% of the gain.
+- **Not explained:** a 3.7% gap remains for `cpp32` in run 5, and the same 3.7% is there for `cpp32blk`, which does not call `step` at all. I have not found the cause.
+- Flags are not the cause: C and C++ are both built at -Os in the Arduino core (checked in its `platform.txt`). The number of 64-bit multiply call sites is the same (5 and 5, counted in the disassembly).
+- Not measured: the Nano 33 BLE (Cortex-M4F) with C++, the flash size of the C++ variants against the C ones, the per-sample C versions with `step` made inline (the reverse experiment), and the FIR.
+- Limits: one board, one run of each sketch, interrupts masked, data in RAM. Differences of 1 to 2% between programs are not meaningful (see above), so the 3.7% gap is only a little above the noise.
