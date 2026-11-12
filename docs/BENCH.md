@@ -326,7 +326,7 @@ Predictions written down before the run, and how they scored (I did not say what
 - Same limits as before: one board, one run of the program, interrupts masked, data in RAM, and the 32-bit variants exact only under the checked coefficient bound.
 
 
-## Stage 6: C++ biquad variants (Feather M0 only)
+## Stage 6: C++ biquad variants (Feather M0 and Nano 33 BLE)
 
 Built with AI assistance (Claude). Predictions were written before any C++ code, in [CPP_PREDICTIONS.md](CPP_PREDICTIONS.md); every miss is listed there.
 
@@ -348,5 +348,20 @@ Logs: `bench/logs/feather_run4.log` (default C++ build) and `bench/logs/feather_
 - The C++ is faster than the C on the Feather, which I did not predict (all three cycle predictions, "within 3% of the C version", missed). The generated code, read with the board's own compiler, shows the likely reason: the C cascade calls a separate `dsp_biquad_step` function for every section of every sample, and the C++ templates let the compiler put the step inside the loop. With the step marked not inlined (run 5), the 64-bit variant is within 0.3% of the C version, so inlining explains all of that gain. For the 32-bit per-sample variant, not inlining removes about 69% of the gain.
 - **Not explained:** a 3.7% gap remains for `cpp32` in run 5, and the same 3.7% is there for `cpp32blk`, which does not call `step` at all. I have not found the cause.
 - Flags are not the cause: C and C++ are both built at -Os in the Arduino core (checked in its `platform.txt`). The number of 64-bit multiply call sites is the same (5 and 5, counted in the disassembly).
-- Not measured: the Nano 33 BLE (Cortex-M4F) with C++, the flash size of the C++ variants against the C ones, the per-sample C versions with `step` made inline (the reverse experiment), and the FIR.
+- Not measured on the Feather: the flash size of the C++ variants against the C ones, the per-sample C versions with `step` made inline (the reverse experiment), and the FIR. The Nano is in the next subsection.
 - Limits: one board, one run of each sketch, interrupts masked, data in RAM. Differences of 1 to 2% between programs are not meaningful (see above), so the 3.7% gap is only a little above the noise.
+
+### Result on the Nano 33 BLE (Cortex-M4F, 64 MHz, GCC 14.3.0, speed optimisation)
+
+Log: `bench/logs/nano_run3.log`, 5 complete runs. The checker passes: every output block has the model's CRC-32. The Zephyr app now builds the C++ variants (`CONFIG_CPP` and C++17 in `bench/zephyr/prj.conf`, `BENCH_CPP` and `cpp/dsp_rt.cpp` in `bench/zephyr/CMakeLists.txt`). Cycles per sample, 2-section biquad, last run, against the C variants in the same run:
+
+| Variant | C version | C++ version | Change |
+|---|---|---|---|
+| 64-bit accumulator | `acc64` 133.94 | `cpp64` 133.54 | -0.3% |
+| 32-bit accumulator | `acc32` 87.19 | `cpp32` 82.20 | -5.7% |
+| 32-bit, section by section | `opt32` 50.28 | `cpp32blk` 50.07 | -0.4% |
+
+- On the Nano the C++ matches the C for the 64-bit and section-by-section variants (within 0.4%). Two of the three predictions ("within 3%") held here; the three on the Feather did not.
+- `cpp32` is 5.7% faster than `acc32` and I do not know why. The Feather showed a different pattern (3.7% for both 32-bit variants), so the two boards do not give one explanation. I have not looked at the Nano's disassembly. A guess, untested: the `-O2` build of the C version may already inline `step`, which would explain why `cpp64` and `cpp32blk` show no gain.
+- Flash: the Nano image is 105428 bytes, against 104548 for the earlier C-only image, so +880 bytes (+0.84%). These are whole images built at different times, so this is a rough figure, not a like-for-like size of the C++ code.
+- Limits: one Nano, one run of the program, interrupts masked, data in RAM.
