@@ -81,7 +81,7 @@ Log bench/logs/nano_run3.log, 5 complete runs, checker PASS, every output CRC ma
 - cpp32 82.20 against acc32 87.19 (-5.7%). Predicted within 3%. MISS (faster), cause unknown.
 - cpp32blk 50.07 against opt32 50.28 (-0.4%). Predicted within 3%. HIT.
 Flash (prediction 7): Nano image 105428 bytes against 104548 for the earlier C-only build, +880 bytes (+0.84%). Predicted within +5%. HIT, rough: whole images built at different times. Prediction 5 (no lmul calls) was about the Cortex-M0+ and was only checked on compiler output, not on the board.
-Limits: one Nano, one run of the program. Not looked at: the Nano disassembly. The Zephyr build now enables the C++ variants by default (BENCH_CPP in bench/zephyr/CMakeLists.txt).
+Limits: one Nano, one run of the program. Nano disassembly read for the 32-bit pair only (see BENCH.md Stage 6): the hot loop is identical, and the cause of the 5.7% is still unknown. The Zephyr build now enables the C++ variants by default (BENCH_CPP in bench/zephyr/CMakeLists.txt).
 
 ### More misses
 - I accepted the Arduino USB vendor ID and a SAMD21 banner as proof of the Nano, and made up a claim that the Nano bootloader emulates SAMD21. The board on COM16 was an MKR WAN 1310 (USB ID 2341:0059). Four erase attempts failed on it and nothing was written, as far as the output showed. The right check was the device line of bossac -i, which says nRF52840 for the Nano.
