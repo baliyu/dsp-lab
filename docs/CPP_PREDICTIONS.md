@@ -74,6 +74,7 @@ Cycles per sample, 2-section biquad, last run, against the C variants in the sam
 - cpp32 235.07 against acc32 244.03 (-3.7%). Predicted within 3%. MISS, narrowly. About 69% of the run4 gain is gone; a 3.7% gap remains, cause unknown.
 - cpp32blk 152.45 against opt32 158.33 (-3.7%), the same as run4. Predicted unchanged. HIT. This variant does not call step, so its gap is not explained by inlining either.
 - Feather disassembly read, 14 November 2026 (not predicted in advance; details in BENCH.md Stage 6): for cpp32blk against opt32 the per-sample paths are both 47 instructions, and the C version has one more stack store and one more taken branch, which a rough cost estimate (taken from memory, not validated) puts at about 2 of the measured 2.94 cycles per pass. A lead, not a cause.
+- Feather run 5 structure re-read, 14 November 2026 (not predicted in advance; details in BENCH.md Stage 6): the C++ step and the C step are identical instruction for instruction, and the wrappers differ by about 2 cycles per sample by a hand count (taken against not-taken loop-head branches, costs from memory) out of a measured 8.96. About 7 cycles per sample stay unexplained. A lead only.
 Conclusion, limited: inlining of step explains the whole int64 gain and most of the int32 per-sample gain. The remaining 3.7% in both int32 C++ variants is unexplained. Limits: one board, one run, flash size of this build not recorded.
 
 ### Results on the Nano 33 BLE (12 November 2026)
